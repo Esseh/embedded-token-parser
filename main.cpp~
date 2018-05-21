@@ -1,13 +1,3 @@
-/// Barr Standard Reminder: Item Order
-/// Comment Block
-/// Includes
-/// Datatypes
-/// Constants
-/// Macros
-/// Static Declarations
-/// Private Prototypes
-/// Public Function Bodies
-/// Private Function Bodies
 #include<Arduino.h>
 #include<Adafruit_NeoPixel.h>
 
@@ -15,7 +5,7 @@
 #define VERSION "v0.4"
 
 /// Disable / Enable Debug
-#if 0
+#if 1
 #define NDEBUG
 #endif
 /// Arduino Configuration
@@ -70,6 +60,10 @@ word s_blink_time= 500;      // interval between blinks
 
 // Control Variables
 byte c_main = 0;
+
+
+
+
 
 // Buffers
 byte byte_buffer_index = 0;
@@ -128,6 +122,15 @@ void dump_buffer_state (
     Serial.print(command_flag);
     Serial.println("");
 }
+
+
+
+
+
+
+
+
+
 
 /// Dumps state of buffer without assuming characters.
 void dump_buffer_state2 (
@@ -188,6 +191,14 @@ void dump_state ()
     Serial.print(s_blink_time);
     Serial.println("");
 }
+
+
+
+
+
+
+
+
 
 /// reads any available bytes into the input buffer and sets the command flag if it is ready to parse.
 void read_into_byte_buffer (
@@ -718,7 +729,13 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
 
 }
 
-void t_d13()
+
+
+
+
+
+
+void t_d13 ()
 {
     if(s_d13_on)
     {
@@ -749,6 +766,40 @@ void t_d13()
         digitalWrite(ON_BOARD_LED_PIN,LOW);
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 void t_led()
 {
@@ -812,6 +863,10 @@ void t_rgb()
     strip.setPixelColor(0, s_rgb_red, s_rgb_green, s_rgb_blue);
     strip.show();
 }
+
+
+
+
 
 void setup()
 {
