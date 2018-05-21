@@ -137,6 +137,7 @@ void dump_buffer_state2 (
     Serial.print(command_flag);
     Serial.println("");
 }
+#endif
 
 /// Dumps the entire global program state.
 void dump_state ()
@@ -170,7 +171,6 @@ void dump_state ()
     Serial.print(s_blink_time);
     Serial.println("");
 }
-#endif
 
 /// reads any available bytes into the input buffer and sets the command flag if it is ready to parse.
 void read_into_byte_buffer (
@@ -303,6 +303,294 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
     #endif
 }
 
+void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
+{
+    byte context;
+    byte control;
+    control = token_buffer[0];
+    /// D13
+    if(tD13 == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("D13");
+        #endif
+        control = token_buffer[1];
+        /// D13 > ON
+        if(tON == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("D13 > ON");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("D13 > ON > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+        }
+        /// D13 > OFF
+        else if(tOFF == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("D13 > OFF");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("D13 > OFF > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+        }
+        /// D13 > BLINK
+        else if(tBLINK == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("D13 > BLINK");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("D13 > BLINK > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");
+        }
+    }
+    /// LED
+    else if(tLED == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("LED");
+        #endif
+        control = token_buffer[1];
+        /// LED > GREEN
+        if(tGREEN == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("LED > GREEN");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("LED > GREEN > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+        }
+        /// LED > RED
+        else if(tRED == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("LED > RED");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("LED > RED > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+
+        }
+        /// LED > BLINK
+        else if(tBLINK == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("LED > BLINK");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("LED > BLINK > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+
+        }
+        /// LED > OFF
+        else if(tOFF == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("LED > OFF");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("LED > OFF > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");
+        }
+    }
+    /// RGB
+    else if(tRGB == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("RGB");
+        #endif
+        // TODO
+    }
+    /// SET
+    else if(tSET == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("SET");
+        #endif
+        /// SET > BLINK
+        control = token_buffer[1];
+        if(tBLINK == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("SET > BLINK");
+            #endif
+
+            /// TODO
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");            
+        }
+    }
+    /// STATUS
+    else if(tSTATUS == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("STATUS");
+        #endif
+
+        control = token_buffer[1];
+        /// STATUS > LEDS
+        if(tLED == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("STATUS > LEDS");
+            #endif
+
+            control = token_buffer[2];
+            if(tEOL == control)
+            {
+                #ifndef NDEBUG
+                Serial.println("STATUS > LEDS > EOL");
+                #endif
+
+                // TODO
+            }
+            else
+            {
+                Serial.println("Unrecognized Input");
+            }
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");
+        }
+    }
+    /// VERSION
+    else if(tVERSION == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("VERSION");
+        #endif
+
+        control = token_buffer[1];
+        if(tEOL == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("VERSION > EOL");
+            #endif
+
+            // TODO
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");
+        }
+    }
+    /// HELP
+    else if(tHELP == control)
+    {
+        #ifndef NDEBUG
+        Serial.println("HELP");
+        #endif
+
+        control = token_buffer[1];
+        if(tEOL == control)
+        {
+            #ifndef NDEBUG
+            Serial.println("HELP > EOL");
+            #endif
+
+            // TODO
+        }
+        else
+        {
+            Serial.println("Unrecognized Input");
+        }
+    }
+    token_buffer_index = 0;   
+    command_flag = false;
+}
+
 void setup()
 {
     Serial.begin(BAUD);
@@ -313,6 +601,7 @@ void setup()
     }
     Serial.println("Process Started...");
 }
+
 void loop()
 {
     if(true == command_flag)
@@ -325,10 +614,10 @@ void loop()
             token_lookup, 
             command_flag
         );
+        parse_input(token_buffer,token_buffer_index, command_flag);
         #ifndef NDEBUG
         dump_state();
         #endif
-        token_buffer_index = 0;
     }
     else
     {
