@@ -36,14 +36,28 @@
 // tLEDS is equivalent to tLED when reading in. Unreachable.
 // #define tLEDS    tRED -1
 
+// Determines if it is time to perform tokenization.
 bool command_flag = false;
 
+// State Variables
+bool s_d13_on    = false;
+bool s_d13_blink = false;
+bool s_led_red   = true;    // true = red , false  = green
+bool s_led_on    = false;
+bool s_led_blink = false;
+byte s_rgb_red   = 0;
+byte s_rgb_green = 0;
+byte s_rgb_blue  = 0;
+word s_blink_time= 500;
+
+// Buffers
 byte byte_buffer_index = 0;
 byte byte_buffer[MAX_BUFFER_SIZE];
 
 byte token_buffer_index = 0;
 byte token_buffer[MAX_INSTRUCTION_SIZE];
 
+// Lookup Table
 byte token_lookup[] = {
     'D', '1', tD13,
     'L', 'E', tLED,
@@ -59,6 +73,7 @@ byte token_lookup[] = {
     13 , 13 , tEOL,
 0};
 
+/// Debug Functions
 #ifndef NDEBUG
 void dump_buffer_state (
     byte*byte_buffer,
@@ -91,6 +106,7 @@ void dump_buffer_state (
 }
 #endif
 
+/// reads any available bytes into the input buffer and sets the command flag if it is ready to parse.
 void read_into_byte_buffer (
     byte*byte_buffer,
     byte& byte_buffer_index, 
@@ -141,8 +157,10 @@ void read_into_byte_buffer (
     }
 }
 
-void tokenize (byte*token_buffer,byte& token_buffer_index)
+/// converts all available substrings in input buffer into byte tokens.
+void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byte& byte_buffer_index)
 {
+        
 }
 
 void setup()
@@ -159,7 +177,7 @@ void loop()
 {
     if(true == command_flag)
     {
-
+        tokenize(token_buffer,token_buffer_index,byte_buffer,byte_buffer_index);
     }
     else
     {
