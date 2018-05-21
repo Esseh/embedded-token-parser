@@ -38,10 +38,10 @@
 
 bool command_flag = false;
 
-byte byte_buffer_index = -1;
+byte byte_buffer_index = 0;
 byte byte_buffer[MAX_BUFFER_SIZE];
 
-byte token_buffer_index = -1;
+byte token_buffer_index = 0;
 byte token_buffer[MAX_INSTRUCTION_SIZE];
 
 byte token_lookup[] = {
@@ -67,9 +67,16 @@ void dump_buffer_state (
 ){
     Serial.print("Buffer Contents: ");
     byte i;
-    for(i = 0; i <= byte_buffer_index; i++)
+    for(i = 0; i < byte_buffer_index; i++)
     {
-        Serial.print((char)(byte_buffer[i]));
+        if('\0' == byte_buffer[i])
+        {
+             Serial.print("\\0");
+        }
+        else
+        {
+             Serial.print((char)(byte_buffer[i]));
+        }
     }
     Serial.println("");
     Serial.print("Buffer Index: ");
@@ -92,44 +99,42 @@ void read_into_byte_buffer (
 {
     if(Serial.available())
     {
-/*        /// Get new character to read in.
+        /// Get new character to read in.
         byte new_byte = Serial.read();
 
         /// Echo read to screen.
         Serial.print(new_byte);
 
+        /// If no actual room, error state.
+        if(byte_buffer_index >= MAX_BUFFER_SIZE)
+        {
+            Serial.println("Buffer Size Exceeded, Buffer Dumped");
+            byte_buffer_index = -1;
+            command_flag = false;
+        }
         /// If RC then set the command flag to signal tokenization.
-        if(13 == new_byte)
+        else if(13 == new_byte)
         {
             Serial.println("");
             command_flag = true;
+            byte_buffer[byte_buffer_index] = '\0';
         }
         else
-        /// Otherwise load new byte into the buffer.
         {
-            /// Make room for new character in buffer.
-            byte_buffer_index++;
-        
-            /// If no actual room, error state.
-            if(byte_buffer_index >= MAX_BUFFER_SIZE)
-            {
-                Serial.println("Buffer Size Exceeded, Buffer Dumped");
-                byte_buffer_index = -1;
-            }
+        /// Otherwise load byte into buffer
+            if(' ' == new_byte || '\t' == new_byte)
+            /// White space, load null terminator.
+	    {
+                byte_buffer[byte_buffer_index] = '\0';
+	    }
             else
+            /// General Case, load new character into buffer.
             {
-                if(' ' == new_byte || '\t' == new_byte)
-                /// White space, load null terminator.
-	        {
-                    byte_buffer[byte_buffer_index] = '\0';
-	        }
-                else
-                /// General Case, load new character into buffer.
-                {
-                    byte_buffer[byte_buffer_index] = new_byte;
-                }
+                byte_buffer[byte_buffer_index] = new_byte;
             }
-        } */
+	    /// Prepare for another character in buffer
+        }
+	byte_buffer_index++;
         #ifndef NDEBUG
         dump_buffer_state(byte_buffer,byte_buffer_index,command_flag);
         #endif
@@ -148,8 +153,16 @@ void setup()
     {
        /// Wait for Serial I/O to be ready.
     }
+    Serial.println("Process Started...");
 }
 void loop()
 {
-    read_into_byte_buffer(byte_buffer,byte_buffer_index,command_flag);
+    if(true == command_flag)
+    {
+
+    }
+    else
+    {
+        read_into_byte_buffer(byte_buffer,byte_buffer_index,command_flag);
+    }
 }
