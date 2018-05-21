@@ -10,6 +10,10 @@
 /// Private Function Bodies
 #include<Arduino.h>
 
+/// Disable / Enable Debug
+#if 0
+#define NDEBUG
+#endif
 /// Arduino Configuration
 #define BAUD 115200
 
@@ -40,15 +44,15 @@
 bool command_flag = false;
 
 // State Variables
-bool s_d13_on    = false;
-bool s_d13_blink = false;
-bool s_led_red   = true;    // true = red , false  = green
-bool s_led_on    = false;
-bool s_led_blink = false;
-byte s_rgb_red   = 0;
-byte s_rgb_green = 0;
-byte s_rgb_blue  = 0;
-word s_blink_time= 500;
+bool s_d13_on    = false;    // D13 on or off
+bool s_d13_blink = false;    // D13 blinking or not
+bool s_led_red   = true;     // true = red , false  = green
+bool s_led_on    = false;    // Dual LED on or off
+bool s_led_blink = false;    // Dual LED blinking or not
+byte s_rgb_red   = 0;        // RGB red intensity
+byte s_rgb_green = 0;        // RGB green intensity
+byte s_rgb_blue  = 0;        // RGB blue intensity
+word s_blink_time= 500;      // interval between blinks
 
 // Buffers
 byte byte_buffer_index = 0;
@@ -60,6 +64,7 @@ byte token_buffer[MAX_INSTRUCTION_SIZE];
 // Lookup Table
 byte token_lookup[] = {
     'D', '1', tD13,
+    'R', 'G', tRGB,
     'L', 'E', tLED,
     'S', 'E', tSET,
     'S', 'T', tSTATUS,
@@ -75,11 +80,13 @@ byte token_lookup[] = {
 
 /// Debug Functions
 #ifndef NDEBUG
+/// Dumps state of buffer.
 void dump_buffer_state (
     byte*byte_buffer,
     byte byte_buffer_index, 
     bool command_flag
 ){
+    Serial.println("");
     Serial.print("Buffer Contents: ");
     byte i;
     for(i = 0; i < byte_buffer_index; i++)
@@ -102,6 +109,65 @@ void dump_buffer_state (
     Serial.println("");
     Serial.print("Command Flag State: ");
     Serial.print(command_flag);
+    Serial.println("");
+}
+
+/// Dumps state of buffer without assuming characters.
+void dump_buffer_state2 (
+    byte*byte_buffer,
+    byte byte_buffer_index, 
+    bool command_flag
+){
+    Serial.println("");
+    Serial.print("Buffer Contents: ");
+    byte i;
+    for(i = 0; i < byte_buffer_index; i++)
+    {
+        Serial.print((byte_buffer[i]));
+        Serial.print(' ');
+    }
+    Serial.println("");
+    Serial.print("Buffer Index: ");
+    Serial.print(byte_buffer_index);
+    Serial.println("");
+    Serial.print("Max Buffer Size: ");
+    Serial.print(MAX_BUFFER_SIZE);
+    Serial.println("");
+    Serial.print("Command Flag State: ");
+    Serial.print(command_flag);
+    Serial.println("");
+}
+
+/// Dumps the entire global program state.
+void dump_state ()
+{
+    Serial.println("");
+    Serial.print("D13 ON: ");
+    Serial.print(s_d13_on);
+    Serial.println("");
+    Serial.print("D13 BLINK: ");
+    Serial.print(s_d13_blink);
+    Serial.println("");
+    Serial.print("LED RED: ");
+    Serial.print(s_led_red);
+    Serial.println("");
+    Serial.print("LED ON: ");
+    Serial.print(s_led_on);
+    Serial.println("");
+    Serial.print("LED BLINK: ");
+    Serial.print(s_led_blink);
+    Serial.println("");
+    Serial.print("RGB RED: ");
+    Serial.print(s_rgb_red);
+    Serial.println("");
+    Serial.print("RGB GREEN: ");
+    Serial.print(s_rgb_green);
+    Serial.println("");
+    Serial.print("RGB BLUE: ");
+    Serial.print(s_rgb_blue);
+    Serial.println("");
+    Serial.print("BLINK TIME: ");
+    Serial.print(s_blink_time);
     Serial.println("");
 }
 #endif
@@ -152,15 +218,89 @@ void read_into_byte_buffer (
         }
 	byte_buffer_index++;
         #ifndef NDEBUG
+        Serial.println("BYTE BUFFER STATE");
         dump_buffer_state(byte_buffer,byte_buffer_index,command_flag);
         #endif
     }
 }
 
-/// converts all available substrings in input buffer into byte tokens.
-void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byte& byte_buffer_index)
+// Retreives a token from the lookup table.
+byte get_token(byte hint1, byte hint2,byte*lookup_table)
 {
-        
+    byte lookup_iterator;
+    for(lookup_iterator = 0; lookup_table[lookup_iterator] != 0; lookup_iterator += 3)
+    {
+        if((hint1 == lookup_table[lookup_iterator]) && (hint2 == lookup_table[lookup_iterator+1]))
+        {
+            return lookup_table[lookup_iterator+2];
+        }
+    }
+    return tERR;
+}
+
+/// converts all available substrings in input buffer into byte tokens.
+void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byte& byte_buffer_index, byte*lookup_table, bool& command_flag)
+{
+    byte byte_buffer_iterator;
+    byte_buffer_iterator = 0;
+    while(byte_buffer_iterator < byte_buffer_index)
+    {
+        // First character is null case.
+        if(byte_buffer[byte_buffer_iterator] == '\0')
+        {
+            byte_buffer_iterator++;
+        }
+        // General case
+        else
+        {
+            // no room, error state
+            if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
+            {
+                Serial.println("Instruction is too large");
+                byte_buffer_index = 0;
+                token_buffer_index = 0;
+                command_flag = false;
+                return;
+            }
+            // read in new token into token buffer.
+            byte new_token = get_token(
+                byte_buffer[byte_buffer_iterator],
+                byte_buffer[byte_buffer_iterator+1],
+                lookup_table
+            );
+            token_buffer[token_buffer_index] = new_token;
+            token_buffer_index++;
+            while(byte_buffer[byte_buffer_iterator] != '\0')
+            {
+                byte_buffer_iterator++;
+            }
+            #ifndef NDEBUG
+            Serial.println("TOKEN BUFFER STATE");
+            dump_buffer_state2(token_buffer, token_buffer_index, command_flag);
+            #endif
+        }
+    }
+    // no room, error state
+    if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
+    {
+        Serial.println("Instruction is too large");
+        byte_buffer_index = 0;
+        token_buffer_index = 0;
+        command_flag = false;
+        return;
+    }
+    else
+    {
+        // append EOL and clear input buffer.
+        token_buffer[token_buffer_index] = get_token(13,13,lookup_table);
+        token_buffer_index++;
+        byte_buffer_index = 0;
+        command_flag = false;
+    }
+    #ifndef NDEBUG
+    Serial.println("TOKEN BUFFER STATE");
+    dump_buffer_state2(token_buffer, token_buffer_index, command_flag);
+    #endif
 }
 
 void setup()
@@ -177,7 +317,18 @@ void loop()
 {
     if(true == command_flag)
     {
-        tokenize(token_buffer,token_buffer_index,byte_buffer,byte_buffer_index);
+        tokenize(
+            token_buffer, 
+            token_buffer_index, 
+            byte_buffer, 
+            byte_buffer_index, 
+            token_lookup, 
+            command_flag
+        );
+        #ifndef NDEBUG
+        dump_state();
+        #endif
+        token_buffer_index = 0;
     }
     else
     {
