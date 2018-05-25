@@ -5,7 +5,7 @@
 #define VERSION "v0.4"
 
 /// Disable / Enable Debug
-#if 1
+#if 0
 #define NDEBUG
 #endif
 
@@ -47,19 +47,6 @@
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
-
-/// Bit Indexed State Flags
-/// 0 - command_flag
-/// 1 - s_d13_on
-/// 2 - s_d13_blink
-/// 3 - s_d13_blink_toggle
-/// 4 - s_led_red
-/// 5 - s_led_on
-/// 6 - s_led_blink
-/// 7 - s_led_blink_toggle
-#define SET_BIT(set,index,value) set = (set ^ (1 << index - 1))
-#define GET_BIT(set,index) ((set >> index) & 1)
-byte s_flags_1;
 
 // Determines if it is time to perform tokenization.
 bool command_flag = false;
@@ -176,7 +163,6 @@ void dump_buffer_state (
         }
     }
     print_map(NEWLINE);
-    Serial.print(F());
     print_map(BUFFER_INDEX);
     print_map(NEWLINE);
     print_map(BUFFER_SIZE);
@@ -202,13 +188,13 @@ void dump_buffer_state2 (
         Serial.print(' ');
     }
     print_map(NEWLINE);
-    print_map(BUFFER_INDEX)
+    print_map(BUFFER_INDEX);
     Serial.print(byte_buffer_index);
     print_map(NEWLINE);
     print_map(BUFFER_SIZE);
     Serial.print(MAX_BUFFER_SIZE);
     print_map(NEWLINE);
-    print_map(COMMAND_FLAG_STATE)
+    print_map(COMMAND_FLAG_STATE);
     Serial.print(command_flag);
     print_map(NEWLINE);
 }
@@ -301,6 +287,12 @@ void read_into_byte_buffer ()
     }
 }
 
+void append_token(byte token)
+{
+    token_buffer[token_buffer_index] = token;
+    token_buffer_index++;
+}
+
 // Retreives a token from the lookup table.
 byte get_token(byte hint1, byte hint2,byte*lookup_table)
 {
@@ -315,29 +307,61 @@ byte get_token(byte hint1, byte hint2,byte*lookup_table)
     return tERR;
 }
 
+/// Checks if a buffer overflow error occured.
+bool buffer_overflow(byte index, byte size)
+{
+    if(index >= size)
+    {
+        print_map(INSTRUCTION_TOO_LARGE);
+        byte_buffer_index = 0;
+        token_buffer_index = 0;
+        command_flag = false;
+    }
+    return index >= size;
+}
+
+/// Gets a word size value based on a buffer string.
+word get_numerical_token(byte&byte_buffer_iterator)
+{
+    word prospective_token;
+    prospective_token = 0;
+    while(byte_buffer[byte_buffer_iterator] != '\0')
+    {
+        prospective_token *= 10;
+        prospective_token += (byte_buffer[byte_buffer_iterator] - '0');
+        if(
+            (byte_buffer[byte_buffer_iterator] < '0') 
+            || (byte_buffer[byte_buffer_iterator] > '9')
+        )
+        {
+            return tERR;
+        }
+        byte_buffer_iterator++;
+    }
+    #ifndef NDEBUG
+    Serial.print(F("BUILDING NUMERICAL TOKEN: "));
+    Serial.print(prospective_token);
+    Serial.println(F(""));
+    #endif
+    return prospective_token;
+}
+
 /// converts all available substrings in input buffer into byte tokens.
 void tokenize ()
 {
-    byte byte_buffer_iterator;
-    byte_buffer_iterator = 0;
-    while(byte_buffer_iterator < byte_buffer_index)
+    byte byte_buffer_iterator = 0;
+    while(byte_buffer_iterator < byte_buffer_index) // iterate through all 'found' characters
     {
-        // First character is null case.
-        if(byte_buffer[byte_buffer_iterator] == '\0')
+        if('\0' == byte_buffer[byte_buffer_iterator])
         {
-            byte_buffer_iterator++;
+            byte_buffer_iterator++; // ignore null characters
         }
         // General case
         else
         {
-            // no room, error state
-            if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
+            if(buffer_overflow(token_buffer_index, MAX_INSTRUCTION_SIZE))
             {
-                print_map(INSTRUCTION_TOO_LARGE);
-                byte_buffer_index = 0;
-                token_buffer_index = 0;
-                command_flag = false;
-                return;
+                return; // no room
             }
             // read in new token into token buffer.
             byte new_token = get_token(
@@ -348,76 +372,30 @@ void tokenize ()
             
             /// tERR but it's a number case.
             if(
-            (tERR == new_token) 
-            && (byte_buffer[byte_buffer_iterator] >= '0') 
-            && (byte_buffer[byte_buffer_iterator] <= '9')
+                (tERR == new_token) 
+                && (byte_buffer[byte_buffer_iterator] >= '0') 
+                && (byte_buffer[byte_buffer_iterator] <= '9')
             )
             {
-                word prospective_token;
-                bool num_token_err = false;
-                prospective_token = 0;
-                while(byte_buffer[byte_buffer_iterator] != '\0')
+                word prospective_token = get_numerical_token(byte_buffer_iterator);
+                if(prospective_token > 255)    // Word Size Case
                 {
-                    prospective_token *= 10;
-                    prospective_token += (byte_buffer[byte_buffer_iterator] - '0');
-                    if(
-                        (byte_buffer[byte_buffer_iterator] < '0') 
-                        || (byte_buffer[byte_buffer_iterator] > '9')
-                    )
+                    if(buffer_overflow(token_buffer_index + 1, MAX_INSTRUCTION_SIZE))
                     {
-                        num_token_err = true;
+                        return;                // no extra room
                     }
-                    byte_buffer_iterator++;
-                    #ifndef NDEBUG
-                    Serial.print(F("BUILDING NUMERICAL TOKEN: "));
-                    Serial.print(prospective_token);
-                    Serial.println(F(""));
-                    Serial.print(F("TOKEN ERROR STATE: "));
-                    Serial.print(num_token_err);
-                    Serial.println(F(""));
-                    #endif
+                    append_token(prospective_token >> 8);         // pre-emptively insert left 8 bits of word.
+                    new_token = ((prospective_token) << 8) >> 8;  // set token from tERR to right 8 bits of word.
                 }
-                /// Attempt numerical token so long as it is a valid number.
-                if(!num_token_err)
+                else
                 {
-                    /// Word Size Case, insert first byte then set token to second byte.
-                    if(prospective_token > 255)
-                    {
-                        // no extra room, error state
-                        if((token_buffer_index + 1) >= MAX_INSTRUCTION_SIZE)
-                        {
-                            print_map(INSTRUCTION_TOO_LARGE);
-                            byte_buffer_index = 0;
-                            token_buffer_index = 0;
-                            command_flag = false;
-                            return;
-                        }
-
-                        // pre-emptively insert left 8 bits of word.
-                        byte left_byte;
-                        left_byte = prospective_token >> 8;             
-                        token_buffer[token_buffer_index] = left_byte;
-
-                        token_buffer_index++;
-
-                        // set token from tERR to right 8 bits of word.
-                        byte right_byte;
-                        right_byte = ((prospective_token) << 8) >> 8;
-                        new_token = right_byte;
-                    }
-                    /// Byte Size Case, set token to created byte. No need for transformation.
-                   else
-                    {
-                        new_token = prospective_token;
-                    }
+                    new_token = prospective_token;
                 }
             }
-
-            token_buffer[token_buffer_index] = new_token;
-            token_buffer_index++;
+            append_token(new_token); 
             while(byte_buffer[byte_buffer_iterator] != '\0')
             {
-                byte_buffer_iterator++;
+                byte_buffer_iterator++; // prepare for next token
             }
             #ifndef NDEBUG
             Serial.println(F("TOKEN BUFFER STATE"));
@@ -425,20 +403,13 @@ void tokenize ()
             #endif
         }
     }
-    // no room, error state
-    if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
+    if(buffer_overflow(token_buffer_index, MAX_INSTRUCTION_SIZE))
     {
-        print_map(INSTRUCTION_TOO_LARGE);
-        byte_buffer_index = 0;
-        token_buffer_index = 0;
-        command_flag = false;
-        return;
+        return;        // no room
     }
     else
     {
-        // append EOL and clear input buffer.
-        token_buffer[token_buffer_index] = get_token(13,13,token_lookup);
-        token_buffer_index++;
+        append_token(get_token(13,13,token_lookup));    // append EOL
         byte_buffer_index = 0;
         command_flag = false;
     }
