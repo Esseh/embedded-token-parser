@@ -8,6 +8,7 @@
 #if 1
 #define NDEBUG
 #endif
+
 /// Arduino Configuration
 #define BAUD 115200
 #define TIME_QUANTUM 50
@@ -38,6 +39,11 @@
 #define tRED     tGREEN -1
 // tLEDS is equivalent to tLED when reading in. Unreachable.
 // #define tLEDS    tRED -1
+
+/// Debug Strings
+#ifndef NDEGBUG
+
+#endif
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
@@ -97,30 +103,30 @@ void dump_buffer_state (
     byte byte_buffer_index, 
     bool command_flag
 ){
-    Serial.println("");
-    Serial.print("Buffer Contents: ");
+    Serial.println(F(""));
+    Serial.print(F("Buffer Contents: "));
     byte i;
     for(i = 0; i < byte_buffer_index; i++)
     {
         if('\0' == byte_buffer[i])
         {
-             Serial.print("\\0");
+             Serial.print(F("\\0"));
         }
         else
         {
              Serial.print((char)(byte_buffer[i]));
         }
     }
-    Serial.println("");
-    Serial.print("Buffer Index: ");
+    Serial.println(F(""));
+    Serial.print(F("Buffer Index: "));
     Serial.print(byte_buffer_index);
-    Serial.println("");
-    Serial.print("Max Buffer Size: ");
+    Serial.println(F(""));
+    Serial.print(F("Max Buffer Size: "));
     Serial.print(MAX_BUFFER_SIZE);
-    Serial.println("");
-    Serial.print("Command Flag State: ");
+    Serial.println(F(""));
+    Serial.print(F("Command Flag State: "));
     Serial.print(command_flag);
-    Serial.println("");
+    Serial.println(F(""));
 }
 
 
@@ -138,58 +144,58 @@ void dump_buffer_state2 (
     byte byte_buffer_index, 
     bool command_flag
 ){
-    Serial.println("");
-    Serial.print("Buffer Contents: ");
+    Serial.println(F(""));
+    Serial.print(F("Buffer Contents: "));
     byte i;
     for(i = 0; i < byte_buffer_index; i++)
     {
         Serial.print((byte_buffer[i]));
         Serial.print(' ');
     }
-    Serial.println("");
-    Serial.print("Buffer Index: ");
+    Serial.println(F(""));
+    Serial.print(F("Buffer Index: "));
     Serial.print(byte_buffer_index);
-    Serial.println("");
-    Serial.print("Max Buffer Size: ");
+    Serial.println(F(""));
+    Serial.print(F("Max Buffer Size: "));
     Serial.print(MAX_BUFFER_SIZE);
-    Serial.println("");
-    Serial.print("Command Flag State: ");
+    Serial.println(F(""));
+    Serial.print(F("Command Flag State: "));
     Serial.print(command_flag);
-    Serial.println("");
+    Serial.println(F(""));
 }
 #endif
 
 /// Dumps the entire global program state.
 void dump_state ()
 {
-    Serial.println("");
-    Serial.print("D13 ON: ");
+    Serial.println(F(""));
+    Serial.print(F("D13 ON: "));
     Serial.print(s_d13_on);
-    Serial.println("");
-    Serial.print("D13 BLINK: ");
+    Serial.println(F(""));
+    Serial.print(F("D13 BLINK: "));
     Serial.print(s_d13_blink);
-    Serial.println("");
-    Serial.print("LED RED: ");
+    Serial.println(F(""));
+    Serial.print(F("LED RED: "));
     Serial.print(s_led_red);
-    Serial.println("");
-    Serial.print("LED ON: ");
+    Serial.println(F(""));
+    Serial.print(F("LED ON: "));
     Serial.print(s_led_on);
-    Serial.println("");
-    Serial.print("LED BLINK: ");
+    Serial.println(F(""));
+    Serial.print(F("LED BLINK: "));
     Serial.print(s_led_blink);
-    Serial.println("");
-    Serial.print("RGB RED: ");
+    Serial.println(F(""));
+    Serial.print(F("RGB RED: "));
     Serial.print(s_rgb_red);
-    Serial.println("");
-    Serial.print("RGB GREEN: ");
+    Serial.println(F(""));
+    Serial.print(F("RGB GREEN: "));
     Serial.print(s_rgb_green);
-    Serial.println("");
-    Serial.print("RGB BLUE: ");
+    Serial.println(F(""));
+    Serial.print(F("RGB BLUE: "));
     Serial.print(s_rgb_blue);
-    Serial.println("");
-    Serial.print("BLINK TIME: ");
+    Serial.println(F(""));
+    Serial.print(F("BLINK TIME: "));
     Serial.print(s_blink_time);
-    Serial.println("");
+    Serial.println(F(""));
 }
 
 
@@ -213,19 +219,19 @@ void read_into_byte_buffer (
         byte new_byte = Serial.read();
 
         /// Echo read to screen.
-        Serial.print(new_byte);
+        Serial.print((char)new_byte);
 
         /// If no actual room, error state.
         if(byte_buffer_index >= MAX_BUFFER_SIZE)
         {
-            Serial.println("Buffer Size Exceeded, Buffer Dumped");
+            Serial.println(F("Buffer Size Exceeded, Buffer Dumped"));
             byte_buffer_index = -1;
             command_flag = false;
         }
         /// If RC then set the command flag to signal tokenization.
         else if(13 == new_byte)
         {
-            Serial.println("");
+            Serial.println(F(""));
             command_flag = true;
             byte_buffer[byte_buffer_index] = '\0';
         }
@@ -246,7 +252,7 @@ void read_into_byte_buffer (
         }
 	byte_buffer_index++;
         #ifndef NDEBUG
-        Serial.println("BYTE BUFFER STATE");
+        Serial.println(F("BYTE BUFFER STATE"));
         dump_buffer_state(byte_buffer,byte_buffer_index,command_flag);
         #endif
     }
@@ -284,7 +290,7 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
             // no room, error state
             if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
             {
-                Serial.println("Instruction is too large");
+                Serial.println(F("Instruction is too large"));
                 byte_buffer_index = 0;
                 token_buffer_index = 0;
                 command_flag = false;
@@ -320,12 +326,12 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
                     }
                     byte_buffer_iterator++;
                     #ifndef NDEBUG
-                    Serial.print("BUILDING NUMERICAL TOKEN: ");
+                    Serial.print(F("BUILDING NUMERICAL TOKEN: "));
                     Serial.print(prospective_token);
-                    Serial.println("");
-                    Serial.print("TOKEN ERROR STATE: ");
+                    Serial.println(F(""));
+                    Serial.print(F("TOKEN ERROR STATE: "));
                     Serial.print(num_token_err);
-                    Serial.println("");
+                    Serial.println(F(""));
                     #endif
                 }
                 /// Attempt numerical token so long as it is a valid number.
@@ -337,7 +343,7 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
                         // no extra room, error state
                         if((token_buffer_index + 1) >= MAX_INSTRUCTION_SIZE)
                         {
-                            Serial.println("Instruction is too large");
+                            Serial.println(F("Instruction is too large"));
                             byte_buffer_index = 0;
                             token_buffer_index = 0;
                             command_flag = false;
@@ -371,7 +377,7 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
                 byte_buffer_iterator++;
             }
             #ifndef NDEBUG
-            Serial.println("TOKEN BUFFER STATE");
+            Serial.println(F("TOKEN BUFFER STATE"));
             dump_buffer_state2(token_buffer, token_buffer_index, command_flag);
             #endif
         }
@@ -379,7 +385,7 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
     // no room, error state
     if(token_buffer_index >= MAX_INSTRUCTION_SIZE)
     {
-        Serial.println("Instruction is too large");
+        Serial.println(F("Instruction is too large"));
         byte_buffer_index = 0;
         token_buffer_index = 0;
         command_flag = false;
@@ -394,35 +400,34 @@ void tokenize (byte*token_buffer,byte& token_buffer_index, byte*byte_buffer, byt
         command_flag = false;
     }
     #ifndef NDEBUG
-    Serial.println("TOKEN BUFFER STATE");
+    Serial.println(F("TOKEN BUFFER STATE"));
     dump_buffer_state2(token_buffer, token_buffer_index, command_flag);
     #endif
 }
 
 void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
 {
-    byte context;
     byte control;
     control = token_buffer[0];
     /// D13
     if(tD13 == control)
     {
         #ifndef NDEBUG
-        Serial.println("D13");
+        Serial.println(F("D13"));
         #endif
         control = token_buffer[1];
         /// D13 > ON
         if(tON == control)
         {
             #ifndef NDEBUG
-            Serial.println("D13 > ON");
+            Serial.println(F("D13 > ON"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("D13 > ON > EOL");
+                Serial.println(F("D13 > ON > EOL"));
                 #endif
                 
                 s_d13_on    = true;
@@ -430,21 +435,21 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         /// D13 > OFF
         else if(tOFF == control)
         {
             #ifndef NDEBUG
-            Serial.println("D13 > OFF");
+            Serial.println(F("D13 > OFF"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("D13 > OFF > EOL");
+                Serial.println(F("D13 > OFF > EOL"));
                 #endif
                 
                 s_d13_on    = false;
@@ -452,21 +457,21 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         /// D13 > BLINK
         else if(tBLINK == control)
         {
             #ifndef NDEBUG
-            Serial.println("D13 > BLINK");
+            Serial.println(F("D13 > BLINK"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("D13 > BLINK > EOL");
+                Serial.println(F("D13 > BLINK > EOL"));
                 #endif
                 
                 s_d13_on    = true;
@@ -474,33 +479,33 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// LED
     else if(tLED == control)
     {
         #ifndef NDEBUG
-        Serial.println("LED");
+        Serial.println(F("LED"));
         #endif
         control = token_buffer[1];
         /// LED > GREEN
         if(tGREEN == control)
         {
             #ifndef NDEBUG
-            Serial.println("LED > GREEN");
+            Serial.println(F("LED > GREEN"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("LED > GREEN > EOL");
+                Serial.println(F("LED > GREEN > EOL"));
                 #endif
 
                 s_led_red = false;
@@ -509,21 +514,21 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         /// LED > RED
         else if(tRED == control)
         {
             #ifndef NDEBUG
-            Serial.println("LED > RED");
+            Serial.println(F("LED > RED"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("LED > RED > EOL");
+                Serial.println(F("LED > RED > EOL"));
                 #endif
 
                 s_led_red   = true;
@@ -532,7 +537,7 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
 
         }
@@ -540,14 +545,14 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
         else if(tBLINK == control)
         {
             #ifndef NDEBUG
-            Serial.println("LED > BLINK");
+            Serial.println(F("LED > BLINK"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("LED > BLINK > EOL");
+                Serial.println(F("LED > BLINK > EOL"));
                 #endif
 
                 s_led_on    = true;
@@ -555,7 +560,7 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
 
         }
@@ -563,14 +568,14 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
         else if(tOFF == control)
         {
             #ifndef NDEBUG
-            Serial.println("LED > OFF");
+            Serial.println(F("LED > OFF"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("LED > OFF > EOL");
+                Serial.println(F("LED > OFF > EOL"));
                 #endif
 
                 s_led_on    = false;
@@ -578,25 +583,25 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
 
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// RGB
     else if(tRGB == control)
     {
         #ifndef NDEBUG
-        Serial.println("RGB");
+        Serial.println(F("RGB"));
         #endif
         if(tEOL == token_buffer[4])
         {
             #ifndef NDEBUG
-            Serial.println("RGB > num num num");
+            Serial.println(F("RGB > num num num"));
             #endif
             s_rgb_red   = token_buffer[1];
             s_rgb_green = token_buffer[2];
@@ -604,21 +609,21 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// SET
     else if(tSET == control)
     {
         #ifndef NDEBUG
-        Serial.println("SET");
+        Serial.println(F("SET"));
         #endif
         /// SET > BLINK
         control = token_buffer[1];
         if(tBLINK == control)
         {
             #ifndef NDEBUG
-            Serial.println("SET > BLINK");
+            Serial.println(F("SET > BLINK"));
             #endif
 
             if(tEOL == token_buffer[3])
@@ -631,19 +636,19 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         else
         {
-            Serial.println("Unrecognized Input");            
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// STATUS
     else if(tSTATUS == control)
     {
         #ifndef NDEBUG
-        Serial.println("STATUS");
+        Serial.println(F("STATUS"));
         #endif
 
         control = token_buffer[1];
@@ -651,74 +656,74 @@ void parse_input(byte* token_buffer,byte& token_buffer_index,bool& command_flag)
         if(tLED == control)
         {
             #ifndef NDEBUG
-            Serial.println("STATUS > LEDS");
+            Serial.println(F("STATUS > LEDS"));
             #endif
 
             control = token_buffer[2];
             if(tEOL == control)
             {
                 #ifndef NDEBUG
-                Serial.println("STATUS > LEDS > EOL");
+                Serial.println(F("STATUS > LEDS > EOL"));
                 #endif
 
                 dump_state();
             }
             else
             {
-                Serial.println("Unrecognized Input");
+                Serial.println(F("Unrecognized Input"));
             }
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// VERSION
     else if(tVERSION == control)
     {
         #ifndef NDEBUG
-        Serial.println("VERSION");
+        Serial.println(F("VERSION"));
         #endif
 
         control = token_buffer[1];
         if(tEOL == control)
         {
             #ifndef NDEBUG
-            Serial.println("VERSION > EOL");
+            Serial.println(F("VERSION > EOL"));
             #endif
 
             Serial.println(VERSION);
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     /// HELP
     else if(tHELP == control)
     {
         #ifndef NDEBUG
-        Serial.println("HELP");
+        Serial.println(F("HELP"));
         #endif
 
         control = token_buffer[1];
         if(tEOL == control)
         {
             #ifndef NDEBUG
-            Serial.println("HELP > EOL");
+            Serial.println(F("HELP > EOL"));
             #endif
 
-            Serial.println("D13 (ON | OFF | BLINK)");
-            Serial.println("LED (GREEN | RED | OFF | BLINK)");
-            Serial.println("RGB <0-255> <0-255> <0-255>");
-            Serial.println("SET BLINK <0-65535>");
-            Serial.println("STATUS LEDS");
-            Serial.println("VERSION");
-            Serial.println("HELP");
+            Serial.println(F("D13 (ON | OFF | BLINK)"));
+            Serial.println(F("LED (GREEN | RED | OFF | BLINK)"));
+            Serial.println(F("RGB <0-255> <0-255> <0-255>"));
+            Serial.println(F("SET BLINK <0-65535>"));
+            Serial.println(F("STATUS LEDS"));
+            Serial.println(F("VERSION"));
+            Serial.println(F("HELP"));
         }
         else
         {
-            Serial.println("Unrecognized Input");
+            Serial.println(F("Unrecognized Input"));
         }
     }
     token_buffer_index = 0;   
@@ -877,12 +882,12 @@ void setup()
     strip.begin();
     strip.show();
     Serial.begin(BAUD);
-    Serial.println("Press Enter to begin");
+    Serial.println(F("Press Enter to begin"));
     while(!Serial.available() && (13 != Serial.read()))
     {
        /// Wait for Serial I/O to be ready.
     }
-    Serial.println("Process Started...");
+    Serial.println(F("Process Started..."));
 }
 
 void loop()
