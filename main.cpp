@@ -1,9 +1,14 @@
 #include<Arduino.h>
 #include<Adafruit_NeoPixel.h>
+#include<DHT.h>
 
 #if 0
 #define NDEBUG
 #endif
+
+/// DHT Settings
+#define DHTPIN A0
+#define DHTTYPE DHT22
 
 /// Arduino Settings
 #define BAUD 115200
@@ -14,7 +19,7 @@
 #define RGB_PIN 10
 
 /// Buffer Sizes
-#define MAX_BUFFER_SIZE      16
+#define MAX_BUFFER_SIZE      20
 #define MAX_INSTRUCTION_SIZE 5
 
 /// Error Codes
@@ -40,10 +45,12 @@ typedef byte t_error;
 #define tGREEN   tBLINK -1
 #define tRED     tGREEN -1
 #define tLEDS    tRED -1
-
+#define tHUMIDITY tLEDS -1
+#define tTEMPERATURE tHUMIDITY -1
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
+DHT dht(DHTPIN, DHTTYPE);
 
 // Global Buffers
 byte byte_index = 0;
@@ -80,6 +87,8 @@ byte token_lookup[] = {
     'G', 'R', 5u, tGREEN,
     'R', 'E', 3u, tRED,
     'L', 'E', 4u, tLEDS,
+    'H', 'U', 8u, tHUMIDITY,
+    'T', 'E', 11u, tTEMPERATURE,
 0};
 
 #ifndef NDEBUG
@@ -410,12 +419,22 @@ t_error token_parse(byte* token_buffer)
         break;
         case 2:
             switch(token_buffer[0])
-            {
+            { 
                 case tSTATUS:
                     switch(token_buffer[1])
                     {
                         case tLEDS:
                             dump_state();
+                        break;
+                        case tHUMIDITY:
+                            Serial.print(F("Humidity: "));
+                            Serial.print(dht.readHumidity());
+                            Serial.println(F("%"));
+                        break;
+                        case tTEMPERATURE:
+                            Serial.print(F("Temperature: "));
+                            Serial.print(dht.readTemperature(true));
+                            Serial.println(F("F"));
                         break;
                         default: err = ERROR_GENERIC;
                     }
@@ -598,7 +617,7 @@ void t_io()
 }
 
 void loop()
-{
+{ 
     static byte c_main = 0;
     static unsigned long int passed_time = millis();
     if((millis() - passed_time) > TIME_QUANTUM)
