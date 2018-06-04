@@ -84,7 +84,7 @@ byte s_rgb_blue  = 0;   // RGB blue intensity
 word s_blink_time= 500; // interval between blinks
 
 // Lookup Table
-byte token_lookup[] = {
+const byte token_lookup[] PROGMEM = {
     'D', '1', 3u, tD13,
     'R', 'G', 3u, tRGB,
     'L', 'E', 3u, tLED,
@@ -238,10 +238,10 @@ bool is_number(byte *buffer, byte start_index, byte end_index)
     return result;
 }
 
-byte get_token(byte* buffer, byte start_index, byte end_index, byte* lookup_table)
+byte get_token(byte* buffer, byte start_index, byte end_index, const byte* lookup_table)
 {
     byte lookup_iterator;
-    for(lookup_iterator = 0; lookup_table[lookup_iterator] != 0; lookup_iterator += 4)
+    for(lookup_iterator = 0; pgm_read_byte_near(lookup_table + lookup_iterator) != 0; lookup_iterator += 4)
     {
         byte size = (end_index - start_index);
         byte hint1 = buffer[start_index];
@@ -256,18 +256,18 @@ byte get_token(byte* buffer, byte start_index, byte end_index, byte* lookup_tabl
         }
         hint2 = buffer[start_index + 1];
         if(
-            (hint1 == lookup_table[lookup_iterator]) 
-            && (hint2 == lookup_table[lookup_iterator+1])
-            && (size == lookup_table[lookup_iterator+2])
+            (hint1 == pgm_read_byte_near(lookup_table + lookup_iterator)) 
+            && (hint2 == pgm_read_byte_near(lookup_table + lookup_iterator + 1))
+            && (size == pgm_read_byte_near(lookup_table + lookup_iterator + 2))
         )
         {
             #ifndef NDEBUG
             Serial.println(F(""));
             Serial.print(F("RESULT TOKEN:"));
-            Serial.print(lookup_table[lookup_iterator+3]);
+            Serial.print(pgm_read_byte_near(lookup_table + lookup_iterator) + 3);
             Serial.println(F(""));            
             #endif
-            return lookup_table[lookup_iterator+3];
+            return pgm_read_byte_near(lookup_table + lookup_iterator + 3);
         }
     }
     #ifndef NDEBUG
@@ -303,7 +303,7 @@ t_error token_populate(
     byte* token_buffer,
     byte& token_index,
     byte token_buffer_size,
-    byte* lookup_table
+    const byte* lookup_table
 )
 {
     t_error err = NO_ERROR;
