@@ -47,6 +47,7 @@ typedef byte t_error;
 #define tLEDS    tRED -1
 #define tHUMIDITY tLEDS -1
 #define tTEMPERATURE tHUMIDITY -1
+#define tADD tTEMPERATURE -1
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
@@ -59,17 +60,27 @@ byte byte_buffer[MAX_BUFFER_SIZE];
 byte token_index = 0;
 byte token_buffer[MAX_INSTRUCTION_SIZE];
 
+typedef union t_flag_set1
+{
+    byte obj;
+    struct f
+    {	
+        bool s_d13_on:           1; // D13 on or off
+        bool s_d13_blink :       1; // D13 blinking or not
+        bool s_d13_blink_toggle :1;
+        bool s_led_red :         1; // true = red , false  = green
+        bool s_led_on :          1; // Dual LED on or off
+        bool s_led_blink:        1; // Dual LED blinking or not
+        bool s_led_blink_toggle: 1;
+        bool PLACEHOLDER:        1;
+    } f;
+} t_flag_set1;
+
 // State Variables
-bool s_d13_on    = false;    // D13 on or off
-bool s_d13_blink = false;    // D13 blinking or not
-bool s_d13_blink_toggle = false;
-bool s_led_red   = false;     // true = red , false  = green
-bool s_led_on    = false;    // Dual LED on or off
-bool s_led_blink = false;    // Dual LED blinking or not
-bool s_led_blink_toggle = false;
-byte s_rgb_red   = 0;        // RGB red intensity
-byte s_rgb_green = 0;        // RGB green intensity
-byte s_rgb_blue  = 0;        // RGB blue intensity
+t_flag_set1 flag_set1 = {0}; // Packed Flags      
+byte s_rgb_red   = 0;   // RGB red intensity
+byte s_rgb_green = 0;   // RGB green intensity
+byte s_rgb_blue  = 0;   // RGB blue intensity
 word s_blink_time= 500; // interval between blinks
 
 // Lookup Table
@@ -89,6 +100,7 @@ byte token_lookup[] = {
     'L', 'E', 4u, tLEDS,
     'H', 'U', 8u, tHUMIDITY,
     'T', 'E', 11u, tTEMPERATURE,
+    'A', 'D', 3u, tADD,
 0};
 
 #ifndef NDEBUG
@@ -361,19 +373,19 @@ void dump_state ()
 {
     Serial.println(F(""));
     Serial.print(F("D13 ON: "));
-    Serial.print(s_d13_on);
+    Serial.print(flag_set1.f.s_d13_on);
     Serial.println(F(""));
     Serial.print(F("D13 BLINK: "));
-    Serial.print(s_d13_blink);
+    Serial.print(flag_set1.f.s_d13_blink);
     Serial.println(F(""));
     Serial.print(F("LED RED: "));
-    Serial.print(s_led_red);
+    Serial.print(flag_set1.f.s_led_red);
     Serial.println(F(""));
     Serial.print(F("LED ON: "));
-    Serial.print(s_led_on);
+    Serial.print(flag_set1.f.s_led_on);
     Serial.println(F(""));
     Serial.print(F("LED BLINK: "));
-    Serial.print(s_led_blink);
+    Serial.print(flag_set1.f.s_led_blink);
     Serial.println(F(""));
     Serial.print(F("RGB RED: "));
     Serial.print(s_rgb_red);
@@ -443,16 +455,16 @@ t_error token_parse(byte* token_buffer)
                     switch(token_buffer[1])
                     {
                         case tON:
-                            s_d13_on = true;
-                            s_d13_blink = false;
+                            flag_set1.f.s_d13_on = true;
+                            flag_set1.f.s_d13_blink = false;
                         break;
                         case tOFF:
-                            s_d13_on    = false;
-                            s_d13_blink = false;
+                            flag_set1.f.s_d13_on    = false;
+                            flag_set1.f.s_d13_blink = false;
                         break;
                         case tBLINK:
-                            s_d13_on    = true;
-                            s_d13_blink = true;
+                            flag_set1.f.s_d13_on    = true;
+                            flag_set1.f.s_d13_blink = true;
                         break;
                         default: err = ERROR_GENERIC;
                     }
@@ -461,22 +473,22 @@ t_error token_parse(byte* token_buffer)
                     switch(token_buffer[1])
                     {
                         case tRED:
-                            s_led_red = true;
-                            s_led_on  = true;
-                            s_led_blink = false;
+                            flag_set1.f.s_led_red = true;
+                            flag_set1.f.s_led_on  = true;
+                            flag_set1.f.s_led_blink = false;
                         break;
                         case tGREEN:
-                            s_led_red = false;
-                            s_led_on  = true;
-                            s_led_blink = false;
+                            flag_set1.f.s_led_red = false;
+                            flag_set1.f.s_led_on  = true;
+                            flag_set1.f.s_led_blink = false;
                         break;
                         case tOFF:
-                            s_led_on    = false;
-                            s_led_blink = false;
+                            flag_set1.f.s_led_on    = false;
+                            flag_set1.f.s_led_blink = false;
                         break;
                         case tBLINK:
-                            s_led_on    = true;
-                            s_led_blink = true;
+                            flag_set1.f.s_led_on    = true;
+                            flag_set1.f.s_led_blink = true;
                         break;
                         default: err = ERROR_GENERIC;
                     }
@@ -495,6 +507,10 @@ t_error token_parse(byte* token_buffer)
                         break;
                         default: err = ERROR_GENERIC;
                     }
+                break;
+                case tADD:
+                    Serial.print((word)(token_buffer[1]+token_buffer[2]));
+                    Serial.println(F(""));
                 break;
                 default: err = ERROR_GENERIC;
             }
@@ -543,34 +559,34 @@ Serial.println(F("Process Started..."));
 
 void t_d13 ()
 {
-    if(s_d13_blink)
+    if(flag_set1.f.s_d13_blink)
     {
         static unsigned long int d13_passed_time = millis();
         if((millis() - d13_passed_time) > s_blink_time)
         {
-            digitalWrite(ON_BOARD_LED_PIN,s_d13_blink_toggle);
-            s_d13_blink_toggle = !s_d13_blink_toggle;
+            digitalWrite(ON_BOARD_LED_PIN,flag_set1.f.s_d13_blink_toggle);
+            flag_set1.f.s_d13_blink_toggle = !flag_set1.f.s_d13_blink_toggle;
             d13_passed_time = millis();
         }
     }
-    bool blink_factor = !s_d13_blink || s_d13_blink_toggle;
-    digitalWrite(ON_BOARD_LED_PIN,s_d13_on*blink_factor);
+    bool blink_factor = !flag_set1.f.s_d13_blink || flag_set1.f.s_d13_blink_toggle;
+    digitalWrite(ON_BOARD_LED_PIN,flag_set1.f.s_d13_on*blink_factor);
 }
 
 void t_led()
 {
-    if(s_led_blink)
+    if(flag_set1.f.s_led_blink)
     {
         static unsigned long int led_passed_time = millis();
         if((millis() - led_passed_time) > s_blink_time)
         {
-            s_led_blink_toggle = !s_led_blink_toggle;
+            flag_set1.f.s_led_blink_toggle = !flag_set1.f.s_led_blink_toggle;
             led_passed_time = millis();
         }
     }
-    bool blink_factor = !s_led_blink || s_led_blink_toggle; 
-    digitalWrite(DUAL_RED_PIN,s_led_red*s_led_on*blink_factor);
-    digitalWrite(DUAL_GREEN_PIN,!s_led_red*s_led_on*blink_factor);
+    bool blink_factor = !flag_set1.f.s_led_blink || flag_set1.f.s_led_blink_toggle; 
+    digitalWrite(DUAL_RED_PIN,flag_set1.f.s_led_red*flag_set1.f.s_led_on*blink_factor);
+    digitalWrite(DUAL_GREEN_PIN,!flag_set1.f.s_led_red*flag_set1.f.s_led_on*blink_factor);
 }
 
 void t_rgb()
