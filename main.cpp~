@@ -1,10 +1,15 @@
 #include<Arduino.h>
 #include<Adafruit_NeoPixel.h>
 #include<DHT.h>
+#include<EEPROM.h>
 
 #if 0
 #define NDEBUG
 #endif
+
+/// EEPROM Addresses
+#define TEMPERATURE_INDEX 0 // 0 - 3
+#define HUMIDITY_INDEX    4 // 4 - 7
 
 /// DHT Settings
 #define DHTPIN A0
@@ -12,7 +17,7 @@
 
 /// Arduino Settings
 #define BAUD 115200
-#define TIME_QUANTUM 50
+#define TIME_QUANTUM 100
 #define DUAL_RED_PIN 9
 #define DUAL_GREEN_PIN 8
 #define ON_BOARD_LED_PIN 13
@@ -48,16 +53,17 @@ typedef byte t_error;
 #define tHUMIDITY tLEDS -1
 #define tTEMPERATURE tHUMIDITY -1
 #define tADD tTEMPERATURE -1
+#define tSENSORS tADD -1
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
 DHT dht(DHTPIN, DHTTYPE);
 
 // Global Buffers
-byte byte_index = 0;
+byte byte_index = 0u;
 byte byte_buffer[MAX_BUFFER_SIZE];
 
-byte token_index = 0;
+byte token_index = 0u;
 byte token_buffer[MAX_INSTRUCTION_SIZE];
 
 typedef union t_flag_set1
@@ -78,10 +84,10 @@ typedef union t_flag_set1
 
 // State Variables
 t_flag_set1 flag_set1 = {0}; // Packed Flags      
-byte s_rgb_red   = 0;   // RGB red intensity
-byte s_rgb_green = 0;   // RGB green intensity
-byte s_rgb_blue  = 0;   // RGB blue intensity
-word s_blink_time= 500; // interval between blinks
+byte s_rgb_red   = 0u;   // RGB red intensity
+byte s_rgb_green = 0u;   // RGB green intensity
+byte s_rgb_blue  = 0u;   // RGB blue intensity
+word s_blink_time= 500u; // interval between blinks
 
 // Lookup Table
 const byte token_lookup[] PROGMEM = {
@@ -101,14 +107,15 @@ const byte token_lookup[] PROGMEM = {
     'H', 'U', 8u, tHUMIDITY,
     'T', 'E', 11u, tTEMPERATURE,
     'A', 'D', 3u, tADD,
-0};
+    'S', 'E', 7u, tSENSORS,
+0u};
 
 #ifndef NDEBUG
 void dump_buffer_str(byte*buffer, byte index)
 {
     Serial.println(F(""));
-    byte i = 0;
-    for(i = 0; i < index; i++)
+    byte i;
+    for(i = 0u; i < index; i++)
     {
         Serial.print((char)buffer[i]);
     }
@@ -117,8 +124,8 @@ void dump_buffer_str(byte*buffer, byte index)
 void dump_buffer(byte*buffer, byte index)
 {
     Serial.println(F(""));
-    byte i = 0;
-    for(i = 0; i < index; i++)
+    byte i;
+    for(i = 0u; i < index; i++)
     {
         Serial.print(buffer[i]);
         Serial.print(' ');
@@ -127,15 +134,15 @@ void dump_buffer(byte*buffer, byte index)
 }
 #endif
 
-bool there_is_room_in(byte index, byte max_size)
+const bool there_is_room_in(byte index, byte max_size)
 {
     return index < max_size;
 }
 
 
-bool in_valid_range(byte chr)
+const bool in_valid_range(byte chr)
 {
-    return ((chr >= 'A') && (chr <= 'Z')) || ((chr >= '0') && (chr <= '9')) || (13 == chr) || (' ' == chr);
+    return ((chr >= 'A') && (chr <= 'Z')) || ((chr >= '0') && (chr <= '9')) || (13u == chr) || (' ' == chr);
 }
 
 
@@ -143,10 +150,10 @@ void echo_to_screen(byte chr)
 {
     switch(chr)
     {
-        case 13:
+        case 13u:
             Serial.println(F(""));
         break;
-        case 127:
+        case 127u:
             Serial.print(F("\b \b"));
         break;
         default:
@@ -172,7 +179,7 @@ void place_in_buffer(byte* buffer, byte& byte_index, byte new_byte)
     byte_index++;
 }
 
-t_error buffer_reader(byte* buffer, byte& byte_index, byte max_buffer_size)
+const t_error buffer_reader(byte* buffer, byte& byte_index, byte max_buffer_size)
 {
     t_error err = ERROR_NOT_READY;
     if(there_is_room_in(byte_index, max_buffer_size))
@@ -186,11 +193,11 @@ t_error buffer_reader(byte* buffer, byte& byte_index, byte max_buffer_size)
             {
                 place_in_buffer(buffer, byte_index, new_byte);
             }
-            if(13 == new_byte)
+            if(13u == new_byte)
             {
                 err = NO_ERROR;
             }
-            else if((127 == new_byte) && (byte_index > 0))
+            else if((127u == new_byte) && (byte_index > 0u))
             {
                 byte_index--;
             }
@@ -209,21 +216,21 @@ t_error buffer_reader(byte* buffer, byte& byte_index, byte max_buffer_size)
 void get_next_indices(byte* buffer, byte index, byte &start_index, byte &end_index)
 {
     start_index = end_index;
-    while((' ' == buffer[start_index]) || (13 == buffer[start_index]))
+    while((' ' == buffer[start_index]) || (13u == buffer[start_index]))
     {
         start_index++;
     }
     end_index = start_index;
-    while((buffer[end_index] != 13) && (buffer[end_index] != ' ') && (end_index < index))
+    while((buffer[end_index] != 13u) && (buffer[end_index] != ' ') && (end_index < index))
     {
         end_index++;
     }
 }
 
-bool is_number(byte *buffer, byte start_index, byte end_index)
+const bool is_number(byte *buffer, byte start_index, byte end_index)
 {
     bool result = true;
-    if(buffer[0] == '0')
+    if(buffer[0u] == '0')
     {
         result = false;
     }
@@ -238,10 +245,10 @@ bool is_number(byte *buffer, byte start_index, byte end_index)
     return result;
 }
 
-byte get_token(byte* buffer, byte start_index, byte end_index, const byte* lookup_table)
+const byte get_token(byte* buffer, byte start_index, byte end_index, const byte* lookup_table)
 {
     byte lookup_iterator;
-    for(lookup_iterator = 0; pgm_read_byte_near(lookup_table + lookup_iterator) != 0; lookup_iterator += 4)
+    for(lookup_iterator = 0u; pgm_read_byte_near(lookup_table + lookup_iterator) != 0u; lookup_iterator += 4u)
     {
         byte size = (end_index - start_index);
         byte hint1 = buffer[start_index];
@@ -252,22 +259,22 @@ byte get_token(byte* buffer, byte start_index, byte end_index, const byte* looku
         }
         else
         {
-            hint2 = buffer[start_index+1];
+            hint2 = buffer[start_index+1u];
         }
-        hint2 = buffer[start_index + 1];
+        hint2 = buffer[start_index + 1u];
         if(
             (hint1 == pgm_read_byte_near(lookup_table + lookup_iterator)) 
-            && (hint2 == pgm_read_byte_near(lookup_table + lookup_iterator + 1))
-            && (size == pgm_read_byte_near(lookup_table + lookup_iterator + 2))
+            && (hint2 == pgm_read_byte_near(lookup_table + lookup_iterator + 1u))
+            && (size == pgm_read_byte_near(lookup_table + lookup_iterator + 2u))
         )
         {
             #ifndef NDEBUG
             Serial.println(F(""));
             Serial.print(F("RESULT TOKEN:"));
-            Serial.print(pgm_read_byte_near(lookup_table + lookup_iterator) + 3);
+            Serial.print(pgm_read_byte_near(lookup_table + lookup_iterator) + 3u);
             Serial.println(F(""));            
             #endif
-            return pgm_read_byte_near(lookup_table + lookup_iterator + 3);
+            return pgm_read_byte_near(lookup_table + lookup_iterator + 3u);
         }
     }
     #ifndef NDEBUG
@@ -277,7 +284,7 @@ byte get_token(byte* buffer, byte start_index, byte end_index, const byte* looku
     return tERR;
 }
 
-word get_numerical_token(byte* buffer, byte start_index, byte end_index)
+const word get_numerical_token(byte* buffer, byte start_index, byte end_index)
 {
     word prospective_token = 0;
     byte i;
@@ -297,7 +304,7 @@ word get_numerical_token(byte* buffer, byte start_index, byte end_index)
     return prospective_token;
 }
 
-t_error token_populate(
+const t_error token_populate(
     byte* byte_buffer,
     byte byte_index,
     byte* token_buffer,
@@ -308,7 +315,7 @@ t_error token_populate(
 {
     t_error err = NO_ERROR;
     byte start_index;
-    byte end_index = 0;
+    byte end_index = 0u;
     while(end_index < byte_index)
     {    
         get_next_indices(byte_buffer, byte_index, start_index, end_index);
@@ -332,9 +339,9 @@ t_error token_populate(
             if(is_number(byte_buffer,start_index, end_index))
             {
                 word large_token = get_numerical_token(byte_buffer, start_index, end_index);
-                if(large_token > 255)
+                if(large_token > 255u)
                 {
-                    place_in_buffer(token_buffer, token_index, large_token >> 8);
+                    place_in_buffer(token_buffer, token_index, large_token >> 8u);
                 }
                 new_token = large_token & 0x00FF;
                 if(!there_is_room_in(token_index, token_buffer_size))
@@ -401,18 +408,18 @@ void dump_state ()
     Serial.println(F(""));
 }
 
-t_error token_parse(byte* token_buffer)
+const t_error token_parse(byte* token_buffer)
 {
     t_error err = NO_ERROR;
-    byte instruction_length = 0;
+    byte instruction_length = 0u;
     while(token_buffer[instruction_length] != tEOL)
     {
         instruction_length++;
     }
     switch(instruction_length)
     {
-        case 1:
-            switch(token_buffer[0])
+        case 1u:
+            switch(token_buffer[0u])
             {
                 case tVERSION:
                     Serial.println(F("v0.0"));
@@ -429,30 +436,43 @@ t_error token_parse(byte* token_buffer)
                 default: err = ERROR_GENERIC;
             }
         break;
-        case 2:
-            switch(token_buffer[0])
+        case 2u:
+            switch(token_buffer[0u])
             { 
                 case tSTATUS:
-                    switch(token_buffer[1])
+                    switch(token_buffer[1u])
                     {
+                        float temperature, humidity;
                         case tLEDS:
                             dump_state();
                         break;
                         case tHUMIDITY:
                             Serial.print(F("Humidity: "));
-                            Serial.print(dht.readHumidity());
+                            EEPROM.get(HUMIDITY_INDEX,humidity);
+                            Serial.print(humidity);
                             Serial.println(F("%"));
                         break;
                         case tTEMPERATURE:
                             Serial.print(F("Temperature: "));
-                            Serial.print(dht.readTemperature(true));
+                            EEPROM.get(TEMPERATURE_INDEX, temperature);
+                            Serial.print(temperature);
                             Serial.println(F("F"));
+                        break;
+                        case tSENSORS:
+                            Serial.print(F("Temperature: "));
+                            EEPROM.get(TEMPERATURE_INDEX, temperature);
+                            Serial.print(temperature);
+                            Serial.println(F("F"));
+                            Serial.print(F("Humidity: "));
+                            EEPROM.get(HUMIDITY_INDEX,humidity);
+                            Serial.print(humidity);
+                            Serial.println(F("%"));                            
                         break;
                         default: err = ERROR_GENERIC;
                     }
                 break;
                 case tD13:
-                    switch(token_buffer[1])
+                    switch(token_buffer[1u])
                     {
                         case tON:
                             flag_set1.f.s_d13_on = true;
@@ -470,7 +490,7 @@ t_error token_parse(byte* token_buffer)
                     }
                 break;
                 case tLED:
-                    switch(token_buffer[1])
+                    switch(token_buffer[1u])
                     {
                         case tRED:
                             flag_set1.f.s_led_red = true;
@@ -496,41 +516,41 @@ t_error token_parse(byte* token_buffer)
                 default: err = ERROR_GENERIC;
             }
         break;
-        case 3:
-            switch(token_buffer[0])
+        case 3u:
+            switch(token_buffer[0u])
             {
                 case tSET:
-                    switch(token_buffer[1])
+                    switch(token_buffer[1u])
                     {
                         case tBLINK:
-                            s_blink_time = token_buffer[2];
+                            s_blink_time = token_buffer[2u];
                         break;
                         default: err = ERROR_GENERIC;
                     }
                 break;
                 case tADD:
-                    Serial.print((word)(token_buffer[1]+token_buffer[2]));
+                    Serial.print((word)(token_buffer[1u]+token_buffer[2u]));
                     Serial.println(F(""));
                 break;
                 default: err = ERROR_GENERIC;
             }
         break;
-        case 4:
-            switch(token_buffer[0])
+        case 4u:
+            switch(token_buffer[0u])
             {
                 case tSET:
-                    switch(token_buffer[1])
+                    switch(token_buffer[1u])
                     {
                         case tBLINK:
-                            s_blink_time = (token_buffer[2] << 8) + token_buffer[3];
+                            s_blink_time = (token_buffer[2u] << 8u) + token_buffer[3u];
                         break;
                         default: err = ERROR_GENERIC;
                     }
                 break;
                 case tRGB:
-                    s_rgb_red   = token_buffer[1];
-                    s_rgb_green = token_buffer[2];
-                    s_rgb_blue  = token_buffer[3];
+                    s_rgb_red   = token_buffer[1u];
+                    s_rgb_green = token_buffer[2u];
+                    s_rgb_blue  = token_buffer[3u];
                 break;
                 default: err = ERROR_GENERIC;
             }
@@ -545,7 +565,7 @@ void setup()
     pinMode(DUAL_RED_PIN,OUTPUT);
     pinMode(DUAL_GREEN_PIN,OUTPUT);
     pinMode(ON_BOARD_LED_PIN,OUTPUT);
-    strip = Adafruit_NeoPixel(1, RGB_PIN, NEO_GRB + NEO_KHZ800);
+    strip = Adafruit_NeoPixel(1u, RGB_PIN, NEO_GRB + NEO_KHZ800);
     strip.begin();
     strip.show();
     Serial.begin(BAUD);
@@ -591,7 +611,7 @@ void t_led()
 
 void t_rgb()
 {
-    strip.setPixelColor(0, s_rgb_red, s_rgb_green, s_rgb_blue);
+    strip.setPixelColor(0u, s_rgb_red, s_rgb_green, s_rgb_blue);
     strip.show();
 }
 
@@ -603,7 +623,7 @@ void t_io()
             /// Empty Buffer
             Serial.println(F("Buffer Overflow"));
             {
-                byte_index = 0;
+                byte_index = 0u;
             }
         break;
         case ERROR_NOT_READY:
@@ -626,26 +646,47 @@ void t_io()
                 break;
             }
             // Cleanup
-            byte_index = 0;
-            token_index = 0;
+            byte_index = 0u;
+            token_index = 0u;
         break;
+    }
+}
+
+void t_humidity()
+{
+    static unsigned long int passed_time = millis();
+    if(millis() - passed_time > 60000)
+    {
+        EEPROM.put(HUMIDITY_INDEX,dht.readHumidity());
+        passed_time = millis();
+    }
+}
+void t_temperature()
+{
+    static unsigned long int passed_time = millis();
+    if(millis() - passed_time > 60000)
+    {
+        EEPROM.put(TEMPERATURE_INDEX,dht.readTemperature(true));
+        passed_time = millis();
     }
 }
 
 void loop()
 { 
-    static byte c_main = 0;
+    static byte c_main = 0u;
     static unsigned long int passed_time = millis();
     if((millis() - passed_time) > TIME_QUANTUM)
     {
-       c_main = (c_main + 1) % 4;
+       c_main = (c_main + 1u) % 5u;
        passed_time = millis();
     }
+    t_io();
     switch(c_main)
     {
-        case 0: t_d13(); break;
-        case 1: t_led(); break;
-        case 2: t_rgb(); break;
-        case 3: t_io(); break;
+        case 0u: t_d13(); break;
+        case 1u: t_led(); break;
+        case 2u: t_rgb(); break;
+        case 3u: t_humidity(); break;
+        case 4u: t_temperature(); break;
     }
 }
