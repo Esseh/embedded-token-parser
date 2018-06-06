@@ -54,6 +54,33 @@ typedef byte t_error;
 #define tTEMPERATURE tHUMIDITY -1
 #define tADD tTEMPERATURE -1
 #define tSENSORS tADD -1
+#define tLOG tSENSORS -1
+
+/// String Table
+#define ltTEMPERATURE 1u
+#define ltHUMIDITY    ltTEMPERATURE +1
+#define ltWRITE       ltHUMIDITY    +1
+#define ltFLOAT       ltWRITE       +1  // 4 Bytes
+#define ltPERCENT     ltFLOAT       +1  // Float, percent representation
+
+/// Log Configuration
+#define logENTRY_SIZE 6u
+
+/// Log Index locations
+#define logSINX 8u
+#define logCINX 9u
+
+/// Log Bounds
+#define logSIZE 120u + logENTRY_SIZE
+#define logLOWER_BOUND 10u
+#define logUPPER_BOUND logSIZE + logLOWER_BOUND
+
+char* const log_string_lookup[] PROGMEM = {
+    "Temperature",
+    "Humidity",
+    "WRITE",
+};
+
 
 // Global Library Variables
 Adafruit_NeoPixel strip;
@@ -108,6 +135,7 @@ const byte token_lookup[] PROGMEM = {
     'T', 'E', 11u, tTEMPERATURE,
     'A', 'D', 3u, tADD,
     'S', 'E', 7u, tSENSORS,
+    'L', 'O', 3u, tLOG,
 0u};
 
 #ifndef NDEBUG
@@ -133,6 +161,76 @@ void dump_buffer(byte*buffer, byte index)
     Serial.println(F(""));
 }
 #endif
+
+void print_log()
+{
+    ///log_string_lookup
+    byte sinx = EEPROM.read(logSINX);
+    byte cinx = EEPROM.read(logCINX);
+    while(sinx != cinx)
+    {
+        byte token = EEPROM.read(sinx);
+        switch(token)
+        {
+            union {
+                byte seq[4];
+                float val;
+            } floatType;
+            case ltTEMPERATURE: Serial.print(F("Temperature ")); sinx++; break;
+            case ltHUMIDITY: Serial.print(F("Humidity ")); sinx++; break;
+            case ltWRITE: Serial.print(F("WRITE ")); sinx++; break;
+            case ltFLOAT: 
+                floatType.seq[3] = EEPROM.read(sinx+1);
+                floatType.seq[2] = EEPROM.read(sinx+2);
+                sinx += 3;
+                Serial.print(floatType.val);
+            break;
+            case ltPERCENT: 
+                floatType.seq[3] = EEPROM.read(sinx+1);
+                floatType.seq[2] = EEPROM.read(sinx+2);
+                sinx += 3;
+                Serial.print(floatType.val);
+                Serial.print('%');
+            break;
+            case tEOL: Serial.println(F("")); sinx++; break;
+            default: sinx++;
+        }
+        if(sinx < logLOWER_BOUND)
+        {
+            sinx += logLOWER_BOUND;
+        }
+    }
+}
+
+void make_log_entry(byte module, byte status, byte var_type, byte data1, byte data2)
+{
+    byte sinx = EEPROM.read(logSINX);
+    byte cinx = EEPROM.read(logCINX);
+    EEPROM.write(cinx, module);
+    EEPROM.write(cinx + 1, status);
+    EEPROM.write(cinx + 2u, var_type);
+    EEPROM.write(cinx + 3u, data1);
+    EEPROM.write(cinx + 4u, data2);
+    EEPROM.write(cinx + 5u, tEOL);
+
+    cinx = (cinx + logENTRY_SIZE);
+    cinx %= logUPPER_BOUND;
+    if(cinx < logLOWER_BOUND)
+    {
+        cinx += logLOWER_BOUND;
+    }
+    if(cinx == sinx)
+    {
+        sinx = (sinx  + logENTRY_SIZE);
+        sinx %= logUPPER_BOUND;
+        if(sinx < logLOWER_BOUND)
+        {
+            sinx += logLOWER_BOUND;
+        }
+    }
+    EEPROM.write(logCINX, cinx);
+    EEPROM.write(logSINX, sinx);
+}
 
 const bool there_is_room_in(byte index, byte max_size)
 {
@@ -421,6 +519,9 @@ const t_error token_parse(byte* token_buffer)
         case 1u:
             switch(token_buffer[0u])
             {
+                case tLOG:
+                    print_log();
+                    break;
                 case tVERSION:
                     Serial.println(F("v0.0"));
                 break;
@@ -569,12 +670,50 @@ void setup()
     strip.begin();
     strip.show();
     Serial.begin(BAUD);
+
+    #if 1
+    for (int i = 0 ; i < EEPROM.length() ; i++) {
+        EEPROM.write(i, 0);
+    }
+    #endif
+
+    /// Set EEPROM Indices if neccessary
+    byte EEPROM_sampler;
+    EEPROM_sampler = EEPROM.read(logSINX);
+    #ifndef NDEBUG
+    Serial.print(F("SINX INITIAL: "));
+    Serial.print(EEPROM_sampler);
+    Serial.println(F(""));
+    #endif
+    if(0 == EEPROM_sampler)
+    {
+        EEPROM.write(logSINX,logLOWER_BOUND);
+        #ifndef NDEBUG
+        Serial.println(F("Wrote to SINX"));
+        #endif
+    }
+    EEPROM_sampler = EEPROM.read(logCINX);
+    #ifndef NDEBUG
+    Serial.print(F("CINX INITIAL: "));
+    Serial.print(EEPROM_sampler);    
+    Serial.println(F(""));
+    #endif
+
+    if(0 == EEPROM_sampler)
+    {
+        EEPROM.write(logCINX,logLOWER_BOUND);
+        #ifndef NDEBUG
+        Serial.println(F("Wrote to CINX"));
+        #endif
+    }
+
+
     Serial.println(F("Press Enter to begin"));
     while(!Serial.available() && (13 != Serial.read()))
     {
        /// Wait for Serial I/O to be ready.
     }
-Serial.println(F("Process Started..."));
+    Serial.println(F("Process Started..."));
 }
 
 void t_d13 ()
@@ -655,24 +794,38 @@ void t_io()
 void t_humidity()
 {
     static unsigned long int passed_time = millis();
-    if(millis() - passed_time > 60000)
+    if(millis() - passed_time > 6000)
     {
+        union {
+            byte seq[4];
+            float val;
+        } floatType;
+        floatType.val = dht.readHumidity();
         EEPROM.put(HUMIDITY_INDEX,dht.readHumidity());
         passed_time = millis();
+
+        make_log_entry(ltHUMIDITY, ltWRITE, ltPERCENT, floatType.seq[3], floatType.seq[2]);
     }
 }
 void t_temperature()
 {
     static unsigned long int passed_time = millis();
-    if(millis() - passed_time > 60000)
+    if(millis() - passed_time > 6000)
     {
-        EEPROM.put(TEMPERATURE_INDEX,dht.readTemperature(true));
+        union {
+            byte seq[4];
+            float val;
+        } floatType;
+        floatType.val = dht.readTemperature(true);
+        EEPROM.put(TEMPERATURE_INDEX,floatType.val);
         passed_time = millis();
+        
+        make_log_entry(ltTEMPERATURE, ltWRITE, ltFLOAT, floatType.seq[3], floatType.seq[2]);
     }
 }
 
 void loop()
-{ 
+{
     static byte c_main = 0u;
     static unsigned long int passed_time = millis();
     if((millis() - passed_time) > TIME_QUANTUM)
