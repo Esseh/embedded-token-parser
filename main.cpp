@@ -9,7 +9,7 @@
 #endif
 
 /// Version
-#define VERSION "v2.0.0001"
+#define VERSION "v2.0.0003"
 
 /// EEPROM Addresses
 #define TEMPERATURE_INDEX 0 // 0 - 3
@@ -549,11 +549,12 @@ const t_error token_parse(byte* token_buffer)
                     Serial.println(F("D13 (ON | OFF | BLINK)"));
                     Serial.println(F("LED (GREEN | RED | OFF | BLINK)"));
                     Serial.println(F("RGB <0-255> <0-255> <0-255>"));
-                    Serial.println(F("SET BLINK <0-65535>"));
+                    Serial.println(F("SET (BLINK <0-65535> | RTC)"));
                     Serial.println(F("STATUS (LEDS | TEMPERATURE | HUMIDITY | SENSORS)"));
                     Serial.println(F("VERSION"));
                     Serial.println(F("HELP"));
                     Serial.println(F("LOG"));
+                    Serial.println(F("RTC"));
                 break;
                 default: err = ERROR_GENERIC;
             }
@@ -561,6 +562,16 @@ const t_error token_parse(byte* token_buffer)
         case 2u:
             switch(token_buffer[0u])
             { 
+                case tSET:
+                    switch(token_buffer[1u])
+                    {
+                        case tRTC:
+                            ds3231.promptForTimeAndDate(Serial);
+                            Serial.println();
+                        break;
+                        default: err = ERROR_GENERIC;
+                    }
+                break;
                 case tCLEAR:
                     switch(token_buffer[1u])
                     {
