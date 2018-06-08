@@ -1,11 +1,15 @@
 #include<Arduino.h>
 #include<Adafruit_NeoPixel.h>
-#include<DHT.h>
+#include<SimpleDHT.h>
+#include<DS3231_Simple.h>
 #include<EEPROM.h>
 
 #if 1
 #define NDEBUG
 #endif
+
+/// Version
+#define VERSION "v2.0.0001"
 
 /// EEPROM Addresses
 #define TEMPERATURE_INDEX 0 // 0 - 3
@@ -55,6 +59,8 @@ typedef byte t_error;
 #define tADD tTEMPERATURE -1
 #define tSENSORS tADD -1
 #define tLOG tSENSORS -1
+#define tCLEAR tLOG   -1
+#define tRTC tCLEAR   -1
 
 /// String Table
 #define ltTEMPERATURE 1u
@@ -75,16 +81,10 @@ typedef byte t_error;
 #define logLOWER_BOUND 10u
 #define logUPPER_BOUND logSIZE + logLOWER_BOUND
 
-char* const log_string_lookup[] PROGMEM = {
-    "Temperature",
-    "Humidity",
-    "WRITE",
-};
-
-
 // Global Library Variables
+SimpleDHT22 dht22;
+DS3231_Simple ds3231;
 Adafruit_NeoPixel strip;
-DHT dht(DHTPIN, DHTTYPE);
 
 // Global Buffers
 byte byte_index = 0u;
@@ -136,6 +136,8 @@ const byte token_lookup[] PROGMEM = {
     'A', 'D', 3u, tADD,
     'S', 'E', 7u, tSENSORS,
     'L', 'O', 3u, tLOG,
+    'C', 'L', 5u, tCLEAR,
+    'R', 'T', 3u,  tRTC,
 0u};
 
 #ifndef NDEBUG
@@ -162,9 +164,10 @@ void dump_buffer(byte*buffer, byte index)
 }
 #endif
 
+
+
 void print_log()
 {
-    ///log_string_lookup
     byte sinx = EEPROM.read(logSINX);
     byte cinx = EEPROM.read(logCINX);
     while(sinx != cinx)
@@ -202,34 +205,35 @@ void print_log()
     }
 }
 
+void advance_eeprom_byte_cursor(byte cursor_location, byte lowest_index, byte highest_index, byte increment)
+{
+    byte inx = EEPROM.read(cursor_location);
+    inx -= lowest_index;
+    inx += increment;
+    byte reduced_upper_bound = highest_index - lowest_index;
+    inx %= reduced_upper_bound;
+    inx += lowest_index;
+    EEPROM.write(cursor_location, inx);
+}
+
 void make_log_entry(byte module, byte status, byte var_type, byte data1, byte data2)
 {
     byte sinx = EEPROM.read(logSINX);
     byte cinx = EEPROM.read(logCINX);
-    EEPROM.write(cinx, module);
-    EEPROM.write(cinx + 1, status);
+
+    EEPROM.write(cinx + 0u, module);
+    EEPROM.write(cinx + 1u, status);
     EEPROM.write(cinx + 2u, var_type);
     EEPROM.write(cinx + 3u, data1);
     EEPROM.write(cinx + 4u, data2);
     EEPROM.write(cinx + 5u, tEOL);
 
-    cinx = (cinx + logENTRY_SIZE);
-    cinx %= logUPPER_BOUND;
-    if(cinx < logLOWER_BOUND)
-    {
-        cinx += logLOWER_BOUND;
-    }
+    advance_eeprom_byte_cursor(logCINX,logLOWER_BOUND,logUPPER_BOUND,logENTRY_SIZE);
+    cinx = EEPROM.read(logCINX);
     if(cinx == sinx)
     {
-        sinx = (sinx  + logENTRY_SIZE);
-        sinx %= logUPPER_BOUND;
-        if(sinx < logLOWER_BOUND)
-        {
-            sinx += logLOWER_BOUND;
-        }
+        advance_eeprom_byte_cursor(logSINX,logLOWER_BOUND,logUPPER_BOUND,logENTRY_SIZE);
     }
-    EEPROM.write(logCINX, cinx);
-    EEPROM.write(logSINX, sinx);
 }
 
 const bool there_is_room_in(byte index, byte max_size)
@@ -473,6 +477,16 @@ const t_error token_populate(
     return err;
 }
 
+void clear_log()
+{
+    EEPROM.write(logSINX,logLOWER_BOUND);
+    EEPROM.write(logCINX,logLOWER_BOUND);
+    for (byte i = logLOWER_BOUND ; i < logUPPER_BOUND; i++) {
+        EEPROM.write(i, 0);
+    }
+
+}
+
 /// Dumps the entire global program state.
 void dump_state ()
 {
@@ -519,20 +533,27 @@ const t_error token_parse(byte* token_buffer)
         case 1u:
             switch(token_buffer[0u])
             {
+                case tRTC:
+                    ds3231.printDateTo_DMY(Serial);
+                    Serial.print(F("--"));
+                    ds3231.printTimeTo_HMS(Serial);
+                    Serial.println();
+                break;
                 case tLOG:
                     print_log();
                     break;
                 case tVERSION:
-                    Serial.println(F("v0.0"));
+                    Serial.println(F(VERSION));
                 break;
                 case tHELP:
                     Serial.println(F("D13 (ON | OFF | BLINK)"));
                     Serial.println(F("LED (GREEN | RED | OFF | BLINK)"));
                     Serial.println(F("RGB <0-255> <0-255> <0-255>"));
                     Serial.println(F("SET BLINK <0-65535>"));
-                    Serial.println(F("STATUS LEDS"));
+                    Serial.println(F("STATUS (LEDS | TEMPERATURE | HUMIDITY | SENSORS)"));
                     Serial.println(F("VERSION"));
                     Serial.println(F("HELP"));
+                    Serial.println(F("LOG"));
                 break;
                 default: err = ERROR_GENERIC;
             }
@@ -540,6 +561,16 @@ const t_error token_parse(byte* token_buffer)
         case 2u:
             switch(token_buffer[0u])
             { 
+                case tCLEAR:
+                    switch(token_buffer[1u])
+                    {
+                        case tLOG:
+                            clear_log();
+                            Serial.println(F("Log Erased"));
+                        break;
+                        default: err = ERROR_GENERIC;
+                    }
+                break;
                 case tSTATUS:
                     switch(token_buffer[1u])
                     {
@@ -669,13 +700,8 @@ void setup()
     strip = Adafruit_NeoPixel(1u, RGB_PIN, NEO_GRB + NEO_KHZ800);
     strip.begin();
     strip.show();
+    ds3231.begin();
     Serial.begin(BAUD);
-
-    #if 1
-    for (int i = 0 ; i < EEPROM.length() ; i++) {
-        EEPROM.write(i, 0);
-    }
-    #endif
 
     /// Set EEPROM Indices if neccessary
     byte EEPROM_sampler;
@@ -706,7 +732,6 @@ void setup()
         Serial.println(F("Wrote to CINX"));
         #endif
     }
-
 
     Serial.println(F("Press Enter to begin"));
     while(!Serial.available() && (13 != Serial.read()))
@@ -800,10 +825,9 @@ void t_humidity()
             byte seq[4];
             float val;
         } floatType;
-        floatType.val = dht.readHumidity();
-        EEPROM.put(HUMIDITY_INDEX,dht.readHumidity());
+        dht22.read2(A0, NULL, &(floatType.val), NULL);
+        EEPROM.put(HUMIDITY_INDEX,floatType.val);
         passed_time = millis();
-
         make_log_entry(ltHUMIDITY, ltWRITE, ltPERCENT, floatType.seq[3], floatType.seq[2]);
     }
 }
@@ -816,10 +840,9 @@ void t_temperature()
             byte seq[4];
             float val;
         } floatType;
-        floatType.val = dht.readTemperature(true);
+        dht22.read2(A0, &(floatType.val), NULL,NULL);
         EEPROM.put(TEMPERATURE_INDEX,floatType.val);
-        passed_time = millis();
-        
+        passed_time = millis();        
         make_log_entry(ltTEMPERATURE, ltWRITE, ltFLOAT, floatType.seq[3], floatType.seq[2]);
     }
 }
@@ -827,12 +850,14 @@ void t_temperature()
 void loop()
 {
     static byte c_main = 0u;
+
     static unsigned long int passed_time = millis();
     if((millis() - passed_time) > TIME_QUANTUM)
     {
        c_main = (c_main + 1u) % 5u;
        passed_time = millis();
     }
+
     t_io();
     switch(c_main)
     {
