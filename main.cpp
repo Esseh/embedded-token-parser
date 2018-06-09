@@ -164,6 +164,14 @@ void dump_buffer(byte*buffer, byte index)
 }
 #endif
 
+void print_str(const byte * str)
+{
+    byte c;
+    while(c = pgm_read_byte(str++))
+    {
+        Serial.print((char)c);
+    }
+}
 
 
 void print_log()
@@ -554,6 +562,7 @@ const t_error token_parse(byte* token_buffer)
                     Serial.println(F("VERSION"));
                     Serial.println(F("HELP"));
                     Serial.println(F("LOG"));
+                    Serial.println(F("CLEAR LOG"));
                     Serial.println(F("RTC"));
                 break;
                 default: err = ERROR_GENERIC;
@@ -598,13 +607,13 @@ const t_error token_parse(byte* token_buffer)
                         case tTEMPERATURE:
                             Serial.print(F("Temperature: "));
                             EEPROM.get(TEMPERATURE_INDEX, temperature);
-                            Serial.print(temperature);
+                            Serial.print(temperature*(9.f/5.f)+32.f);
                             Serial.println(F("F"));
                         break;
                         case tSENSORS:
                             Serial.print(F("Temperature: "));
                             EEPROM.get(TEMPERATURE_INDEX, temperature);
-                            Serial.print(temperature);
+                            Serial.print(temperature*(9.f/5.f)+32.f);
                             Serial.println(F("F"));
                             Serial.print(F("Humidity: "));
                             EEPROM.get(HUMIDITY_INDEX,humidity);
@@ -827,34 +836,25 @@ void t_io()
     }
 }
 
-void t_humidity()
+void t_dht22()
 {
     static unsigned long int passed_time = millis();
     if(millis() - passed_time > 6000)
     {
-        union {
+        volatile union {
             byte seq[4];
             float val;
-        } floatType;
-        dht22.read2(A0, NULL, &(floatType.val), NULL);
-        EEPROM.put(HUMIDITY_INDEX,floatType.val);
+        } temperature_float;
+        volatile union {
+            byte seq[4];
+            float val;
+        } humidity_float;
+        dht22.read2(A0, &(temperature_float.val), &(humidity_float.val), NULL);
+        EEPROM.put(TEMPERATURE_INDEX,temperature_float.val);
+        EEPROM.put(HUMIDITY_INDEX,humidity_float.val);
+        make_log_entry(ltTEMPERATURE, ltWRITE, ltFLOAT, temperature_float.seq[3], temperature_float.seq[2]);
+        make_log_entry(ltHUMIDITY, ltWRITE, ltPERCENT, humidity_float.seq[3], humidity_float.seq[2]);
         passed_time = millis();
-        make_log_entry(ltHUMIDITY, ltWRITE, ltPERCENT, floatType.seq[3], floatType.seq[2]);
-    }
-}
-void t_temperature()
-{
-    static unsigned long int passed_time = millis();
-    if(millis() - passed_time > 6000)
-    {
-        union {
-            byte seq[4];
-            float val;
-        } floatType;
-        dht22.read2(A0, &(floatType.val), NULL,NULL);
-        EEPROM.put(TEMPERATURE_INDEX,floatType.val);
-        passed_time = millis();        
-        make_log_entry(ltTEMPERATURE, ltWRITE, ltFLOAT, floatType.seq[3], floatType.seq[2]);
     }
 }
 
@@ -865,7 +865,7 @@ void loop()
     static unsigned long int passed_time = millis();
     if((millis() - passed_time) > TIME_QUANTUM)
     {
-       c_main = (c_main + 1u) % 5u;
+       c_main = (c_main + 1u) % 4u;
        passed_time = millis();
     }
 
@@ -875,7 +875,6 @@ void loop()
         case 0u: t_d13(); break;
         case 1u: t_led(); break;
         case 2u: t_rgb(); break;
-        case 3u: t_humidity(); break;
-        case 4u: t_temperature(); break;
+        case 3u: t_dht22(); break;
     }
 }
