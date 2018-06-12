@@ -11,6 +11,7 @@
 #include"tokenization.h"
 #include"on_demand_debug.h"
 
+
 // Global Library Variables
 SimpleDHT22 dht22;
 DS3231_Simple ds3231;
@@ -22,6 +23,14 @@ byte byte_buffer[MAX_BUFFER_SIZE];
 
 byte token_index = 0u;
 byte token_buffer[MAX_INSTRUCTION_SIZE];
+
+// Alarm Buffer
+#define aCOMFORTABLE 0
+#define aMINOR_UNDER aCOMFORTABLE +1
+#define aMAJOR_UNDER aMINOR_UNDER +1
+#define aMINOR_OVER aMAJOR_UNDER  +1
+#define aMAJOR_OVER aMINOR_OVER   +1
+byte alarms[1];
 
 typedef union t_flag_set1
 {
@@ -232,6 +241,7 @@ const t_error token_parse(byte* token_buffer)
 
 void setup()
 {
+    Serial.begin(BAUD);
     pinMode(DUAL_RED_PIN,OUTPUT);
     pinMode(DUAL_GREEN_PIN,OUTPUT);
     pinMode(ON_BOARD_LED_PIN,OUTPUT);
@@ -239,7 +249,6 @@ void setup()
     strip.begin();
     strip.show();
     ds3231.begin();
-    Serial.begin(BAUD);
 
     /// Set EEPROM Indices if neccessary
     byte EEPROM_sampler;
@@ -272,6 +281,7 @@ void setup()
     }
 
     Serial.println(F("Press Enter to begin"));
+
     while(!Serial.available() && (13 != Serial.read()))
     {
        /// Wait for Serial I/O to be ready.
@@ -376,6 +386,32 @@ void t_dht22()
     }
 }
 
+void t_dht22_alarms()
+{
+    float temperature;
+    EEPROM.get(TEMPERATURE_INDEX,temperature);
+    if(temperature >= 90)
+    {
+        alarms[0] = aMAJOR_OVER;
+    }
+    else if(temperature >= 81)
+    {
+        alarms[0] = aMINOR_OVER;
+    }
+    else if(temperature >= 71)    
+    {
+        alarms[0] = aCOMFORTABLE;
+    }
+    else if(temperature >= 61)
+    {
+        alarms[0] = aMINOR_UNDER;
+    }
+    else
+    {
+        alarms[0] = aMAJOR_UNDER;
+    }
+}
+
 void loop()
 {
     static byte c_main = 0u;
@@ -394,5 +430,6 @@ void loop()
         case 1u: t_led(); break;
         case 2u: t_rgb(); break;
         case 3u: t_dht22(); break;
+        case 4u: t_dht22_alarms(); break;
     }
 }

@@ -3,6 +3,9 @@
 #include"eeprom_helper.h"
 #include"config.hpp"
 #include"token.hpp"
+#include<DS3231_Simple.h>
+
+extern DS3231_Simple ds3231;
 
 void print_log()
 {
@@ -33,7 +36,17 @@ void print_log()
                 Serial.print(floatType.val);
                 Serial.print('%');
             break;
-            case tEOL: Serial.println(F("")); sinx++; break;
+            case tEOL: 
+                sinx++;
+                /// Print Time Stamp
+                Serial.print(' '); Serial.print(EEPROM.read(sinx++)); // Year
+                Serial.print('/'); Serial.print(EEPROM.read(sinx++)); // Month
+                Serial.print('/'); Serial.print(EEPROM.read(sinx++)); // Day
+                Serial.print(' '); Serial.print(EEPROM.read(sinx++)); // Hour
+                Serial.print(':'); Serial.print(EEPROM.read(sinx++)); // Minute
+                Serial.print(':'); Serial.print(EEPROM.read(sinx++)); // Second
+                Serial.println(F(""));  
+                break;
             default: sinx++;
         }
         if(sinx < logLOWER_BOUND)
@@ -48,12 +61,22 @@ void make_log_entry(byte module, byte status, byte var_type, byte data1, byte da
     byte sinx = EEPROM.read(logSINX);
     byte cinx = EEPROM.read(logCINX);
 
+    /// Read and then store timestamp as bytes in order YEAR > MONTH > DAY > HOUR > MINUTE > SECOND
+    DateTime time_stamp;
+    time_stamp = ds3231.read();
+
     EEPROM.write(cinx + 0u, module);
     EEPROM.write(cinx + 1u, status);
     EEPROM.write(cinx + 2u, var_type);
     EEPROM.write(cinx + 3u, data1);
     EEPROM.write(cinx + 4u, data2);
     EEPROM.write(cinx + 5u, tEOL);
+    EEPROM.write(cinx + 6u, time_stamp.Year);
+    EEPROM.write(cinx + 7u, time_stamp.Month);
+    EEPROM.write(cinx + 8u, time_stamp.Day);
+    EEPROM.write(cinx + 9u, time_stamp.Hour);
+    EEPROM.write(cinx + 10u, time_stamp.Minute);
+    EEPROM.write(cinx + 11u, time_stamp.Second);
 
     advance_eeprom_byte_cursor(logCINX,logLOWER_BOUND,logUPPER_BOUND,logENTRY_SIZE);
     cinx = EEPROM.read(logCINX);

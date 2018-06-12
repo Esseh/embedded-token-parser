@@ -32,7 +32,7 @@
 #define RGB_PIN 10
 
 /// Log Configuration
-#define logENTRY_SIZE 6u
+#define logENTRY_SIZE 12u
 
 /// Log Index locations
 #define logSINX 8u
