@@ -26,10 +26,13 @@
 /// Arduino Settings
 #define BAUD 115200
 #define TIME_QUANTUM 100
-#define DUAL_RED_PIN 9
-#define DUAL_GREEN_PIN 8
+#define DUAL_RED_PIN 9		/// Optimized Out
+#define DUAL_GREEN_PIN 8	/// Optimized Out
 #define ON_BOARD_LED_PIN 13
-#define RGB_PIN 10
+#define RGB_PIN 10		/// Optimized Out
+#define ALARM_1_LED 8
+#define POWER_LED   9
+#define RX_TX_LED   10
 
 /// Log Configuration
 #define logENTRY_SIZE 12u
@@ -39,7 +42,7 @@
 #define logCINX 9u
 
 /// Log Bounds
-#define logSIZE 120u + logENTRY_SIZE
+#define logSIZE 240u + logENTRY_SIZE
 #define logLOWER_BOUND 10u
 #define logUPPER_BOUND logSIZE + logLOWER_BOUND
 

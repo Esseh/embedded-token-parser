@@ -17,6 +17,11 @@ SimpleDHT22 dht22;
 DS3231_Simple ds3231;
 Adafruit_NeoPixel strip;
 
+/// On Board LEDs
+Adafruit_NeoPixel alarm1_led;
+Adafruit_NeoPixel network_led;
+Adafruit_NeoPixel power_led;
+
 // Global Buffers
 byte byte_index = 0u;
 byte byte_buffer[MAX_BUFFER_SIZE];
@@ -134,13 +139,13 @@ const t_error token_parse(byte* token_buffer)
                         case tTEMPERATURE:
                             Serial.print(F("Temperature: "));
                             EEPROM.get(TEMPERATURE_INDEX, temperature);
-                            Serial.print(temperature*(9.f/5.f)+32.f);
+                            Serial.print(temperature);
                             Serial.println(F("F"));
                         break;
                         case tSENSORS:
                             Serial.print(F("Temperature: "));
                             EEPROM.get(TEMPERATURE_INDEX, temperature);
-                            Serial.print(temperature*(9.f/5.f)+32.f);
+                            Serial.print(temperature);
                             Serial.println(F("F"));
                             Serial.print(F("Humidity: "));
                             EEPROM.get(HUMIDITY_INDEX,humidity);
@@ -245,9 +250,25 @@ void setup()
     pinMode(DUAL_RED_PIN,OUTPUT);
     pinMode(DUAL_GREEN_PIN,OUTPUT);
     pinMode(ON_BOARD_LED_PIN,OUTPUT);
+
+    #if 0
     strip = Adafruit_NeoPixel(1u, RGB_PIN, NEO_GRB + NEO_KHZ800);
     strip.begin();
     strip.show();
+    #endif
+
+    alarm1_led = Adafruit_NeoPixel(1u, ALARM_1_LED, NEO_GRB + NEO_KHZ800);
+    alarm1_led.begin();
+    alarm1_led.show();
+
+    network_led = Adafruit_NeoPixel(1u, RX_TX_LED, NEO_GRB + NEO_KHZ800);
+    network_led.begin();
+    network_led.show();
+
+    power_led = Adafruit_NeoPixel(1u, POWER_LED, NEO_GRB + NEO_KHZ800);
+    power_led.begin();
+    power_led.show();
+
     ds3231.begin();
 
     /// Set EEPROM Indices if neccessary
@@ -378,6 +399,7 @@ void t_dht22()
             float val;
         } humidity_float;
         dht22.read2(A0, &(temperature_float.val), &(humidity_float.val), NULL);
+        temperature_float.val = temperature_float.val*(9.f/5.f)+23.f;
         EEPROM.put(TEMPERATURE_INDEX,temperature_float.val);
         EEPROM.put(HUMIDITY_INDEX,humidity_float.val);
         make_log_entry(ltTEMPERATURE, ltWRITE, ltFLOAT, temperature_float.seq[3], temperature_float.seq[2]);
@@ -390,25 +412,81 @@ void t_dht22_alarms()
 {
     float temperature;
     EEPROM.get(TEMPERATURE_INDEX,temperature);
+    byte prev = alarms[0];
     if(temperature >= 90)
-    {
+    {   
         alarms[0] = aMAJOR_OVER;
+        if(prev != alarms[0])
+        Serial.println(F("MAJOR OVER"));
     }
     else if(temperature >= 81)
     {
         alarms[0] = aMINOR_OVER;
+        if(prev != alarms[0])
+        Serial.println(F("MINOR OVER"));
     }
     else if(temperature >= 71)    
     {
         alarms[0] = aCOMFORTABLE;
+        if(prev != alarms[0])
+        Serial.println(F("COMFORTABLE"));
     }
     else if(temperature >= 61)
     {
         alarms[0] = aMINOR_UNDER;
+        if(prev != alarms[0])
+        Serial.println(F("MINOR UNDER"));
     }
     else
     {
         alarms[0] = aMAJOR_UNDER;
+        if(prev != alarms[0])
+        Serial.println(F("MAJOR UNDER"));
+    }
+}
+
+byte s_rx_led = false;
+byte s_tx_led = false;
+byte s_power_led = true;
+
+
+t_system_leds()
+{
+    if(s_power_led)
+    {
+        power_led.setPixelColor(0u, 0, 200, 0);
+        power_led.show();
+    }
+    if(s_rx_led)
+    {
+        network_led.setPixelColor(0u, 0, 200, 0);       
+        network_led.show();
+        s_rx_led = false;
+        delay(30);
+    }
+    if(s_tx_led)
+    {
+        network_led.setPixelColor(0u, 238, 118, 0);       
+        network_led.show();
+        s_tx_led = false;
+        delay(30);    
+    }
+    if(!s_rx_led && !s_tx_led)
+    {
+        network_led.setPixelColor(0u, 0, 0, 0);
+        network_led.show();
+        delay(30);
+    }
+    {
+         switch(alarms[0])
+         {
+             case aMAJOR_UNDER: alarm1_led.setPixelColor(0u,128,0,128); break; // purple
+             case aMINOR_UNDER: alarm1_led.setPixelColor(0u,0,0,255);   break; // blue
+             case aCOMFORTABLE: alarm1_led.setPixelColor(0u,0,255,0);   break; // green
+             case aMINOR_OVER:  alarm1_led.setPixelColor(0u,238,118,0); break; // orange
+             case aMAJOR_OVER:  alarm1_led.setPixelColor(0u,255,0,0);   break; // red
+         }
+         alarm1_led.show();
     }
 }
 
@@ -426,10 +504,17 @@ void loop()
     t_io();
     switch(c_main)
     {
+        #if 0
         case 0u: t_d13(); break;
         case 1u: t_led(); break;
         case 2u: t_rgb(); break;
-        case 3u: t_dht22(); break;
-        case 4u: t_dht22_alarms(); break;
+        #endif
+        case 0u: t_dht22(); break;
+        case 1u: t_dht22_alarms(); break;
+        case 2u: t_system_leds(); break;
+        case 3u:
+            s_rx_led = rand() % 2;
+            s_tx_led = rand() % 2;
+            break;
     }
 }
